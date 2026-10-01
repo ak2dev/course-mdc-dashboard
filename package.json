@@ -1,0 +1,20 @@
+{
+  "name": "course-mdc-dashboard",
+  "version": "1.0.0",
+  "description": "Course MDC - Project Showcase & Evaluation Dashboard",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed": "node scripts/seed.js",
+    "reset": "node scripts/seed.js --empty",
+    "import": "node scripts/seed.js --import"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "mongodb": "^6.21.0"
+  }
+}

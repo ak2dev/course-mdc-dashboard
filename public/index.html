@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Course MDC · Project Showcase</title>
+  <meta name="description" content="Submissions, live device previews and multi-tier evaluations for Course MDC." />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <script src="/theme-init.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300..800&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <!-- ============================ Top bar ============================ -->
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <a class="brand" href="/" aria-label="Course MDC home">
+        <span class="brand-mark">M</span>
+        <span class="brand-text">
+          <strong>Course MDC</strong>
+          <small>Showcase &amp; Evaluation</small>
+        </span>
+      </a>
+
+      <label class="search" for="search">
+        <svg class="i"><use href="#i-search" /></svg>
+        <input id="search" type="search" placeholder="Search students, teams, projects…" autocomplete="off" />
+        <kbd>/</kbd>
+      </label>
+
+      <div class="topbar-actions">
+        <button class="icon-btn" id="themeToggle" type="button" aria-label="Toggle theme" title="Toggle theme">
+          <svg class="i theme-sun"><use href="#i-sun" /></svg>
+          <svg class="i theme-moon"><use href="#i-moon" /></svg>
+        </button>
+        <button class="btn btn-secondary" id="facultyBtn" type="button">
+          <svg class="i"><use href="#i-lock" /></svg>
+          <span class="label">Faculty</span>
+        </button>
+        <button class="btn btn-primary" id="submitBtn" type="button">
+          <svg class="i"><use href="#i-plus" /></svg>
+          <span class="hide-sm">Submit project</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- ============================ Hero ============================ -->
+    <section class="hero">
+      <div>
+        <span class="eyebrow"><i class="pulse"></i> Live board · auto-refreshing</span>
+        <h1>Project <span class="grad-text">Showcase</span></h1>
+        <p class="lede">Submissions, live device previews and tiered evaluations for the Course MDC cohort.</p>
+      </div>
+      <div class="hero-actions">
+        <button class="btn btn-secondary" type="button" data-open="rubric">
+          <svg class="i"><use href="#i-book" /></svg> Grading rubric
+        </button>
+        <button class="btn btn-secondary" type="button" data-export>
+          <svg class="i"><use href="#i-download" /></svg> Export CSV
+        </button>
+      </div>
+    </section>
+
+    <!-- ============================ Stats ============================ -->
+    <section class="stats" id="stats" aria-label="Course statistics"></section>
+
+    <!-- ============================ Toolbar ============================ -->
+    <section class="toolbar">
+      <div class="chips" id="chips" role="tablist" aria-label="Filter by tier"></div>
+      <div class="segmented" id="viewSwitch" role="tablist" aria-label="View mode">
+        <button type="button" data-view="table" role="tab"><svg class="i"><use href="#i-table" /></svg><span>Table</span></button>
+        <button type="button" data-view="grid" role="tab"><svg class="i"><use href="#i-grid" /></svg><span>Showcase</span></button>
+        <button type="button" data-view="leaderboard" role="tab"><svg class="i"><use href="#i-trophy" /></svg><span>Leaderboard</span></button>
+      </div>
+    </section>
+
+    <section id="view" class="view" aria-live="polite"></section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-mark sm">M</span>
+        <span>Course MDC · Project Showcase &amp; Evaluation</span>
+      </div>
+      <nav class="footer-links">
+        <button type="button" class="link-btn" data-open="rubric">Grading rubric</button>
+        <button type="button" class="link-btn" data-export>Export CSV</button>
+        <button type="button" class="link-btn" id="footerFaculty">Faculty access</button>
+      </nav>
+    </div>
+  </footer>
+
+  <!-- ============================ Submit / edit dialog ============================ -->
+  <dialog class="modal" id="submitDialog" aria-labelledby="submitTitle">
+    <form id="submitForm" novalidate>
+      <header class="modal-head">
+        <div>
+          <span class="modal-kicker" id="submitKicker">New submission</span>
+          <h2 id="submitTitle">Submit your project</h2>
+        </div>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="i"><use href="#i-x" /></svg></button>
+      </header>
+
+      <div class="modal-body form-grid">
+        <div class="field">
+          <label for="fTeam">Team name <em>*</em></label>
+          <input id="fTeam" name="teamName" maxlength="60" placeholder="e.g. Pixel Pioneers" required />
+        </div>
+        <div class="field">
+          <label for="fTitle">Project title <em>*</em></label>
+          <input id="fTitle" name="title" maxlength="100" placeholder="e.g. Campus Event Hub" required />
+        </div>
+
+        <div class="field span-2">
+          <div class="label-row">
+            <label for="fMemberInput">Team members <em>*</em></label>
+            <span class="member-count" id="memberCount">0 members</span>
+          </div>
+          <div class="tag-input" id="memberTags">
+            <div class="tags"></div>
+            <input id="fMemberInput" placeholder="Type a name, press Enter or comma" autocomplete="off" />
+          </div>
+          <p class="hint">Use each student's full name — it's how course capacity is tracked.</p>
+        </div>
+
+        <div class="field span-2">
+          <label for="fStack">Tech stack &amp; notes</label>
+          <input id="fStack" name="techStack" maxlength="300" placeholder="e.g. Next.js, Tailwind, Supabase" />
+        </div>
+
+        <div class="field">
+          <label for="fVercel">Live deployment URL</label>
+          <div class="input-icon">
+            <svg class="i"><use href="#i-deploy" /></svg>
+            <input id="fVercel" name="vercelUrl" inputmode="url" placeholder="your-app.vercel.app" data-url />
+          </div>
+        </div>
+        <div class="field">
+          <label for="fGithub">GitHub repository</label>
+          <div class="input-icon">
+            <svg class="i"><use href="#i-github" /></svg>
+            <input id="fGithub" name="githubUrl" inputmode="url" placeholder="github.com/team/repo" data-url />
+          </div>
+        </div>
+
+        <fieldset class="teacher-only grade-fieldset span-2">
+          <legend><svg class="i"><use href="#i-shield" /></svg> Faculty evaluation</legend>
+          <div class="score-editor" data-score-editor>
+            <div class="score-inputs">
+              <label for="fScore">Score <span class="muted">(0.0 – 10.0)</span></label>
+              <div class="score-row">
+                <input id="fScore" name="score" type="number" min="0" max="10" step="0.1" placeholder="—" class="score-number" />
+                <input type="range" min="0" max="10" step="0.1" value="0" class="score-range" aria-label="Score slider" />
+              </div>
+            </div>
+            <div class="score-preview"></div>
+          </div>
+          <div class="field">
+            <label for="fNotes">Reviewer notes</label>
+            <textarea id="fNotes" name="reviewerNotes" rows="3" maxlength="2000" placeholder="Feedback, rubric observations…"></textarea>
+          </div>
+        </fieldset>
+      </div>
+
+      <footer class="modal-foot">
+        <p class="foot-note student-only"><svg class="i"><use href="#i-clock" /></svg> New submissions start as <strong>Pending</strong> review.</p>
+        <div class="foot-actions">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="submitSave">
+            <span class="spinner"></span><span class="btn-label">Submit project</span>
+          </button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============================ Login dialog ============================ -->
+  <dialog class="modal modal-sm" id="loginDialog" aria-labelledby="loginTitle">
+    <form id="loginForm" novalidate>
+      <header class="modal-head">
+        <div>
+          <span class="modal-kicker">Restricted</span>
+          <h2 id="loginTitle">Faculty sign in</h2>
+        </div>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="i"><use href="#i-x" /></svg></button>
+      </header>
+      <div class="modal-body">
+        <div class="login-hero">
+          <span class="login-badge"><svg class="i"><use href="#i-shield" /></svg></span>
+          <p>Scoring, editing and deleting projects requires the instructor key.</p>
+        </div>
+        <div class="field">
+          <label for="fPassword">Instructor password</label>
+          <div class="input-icon has-action">
+            <svg class="i"><use href="#i-lock" /></svg>
+            <input id="fPassword" type="password" autocomplete="current-password" placeholder="••••••••••" required />
+            <button type="button" class="input-action" id="togglePw" aria-label="Show password"><svg class="i"><use href="#i-eye" /></svg></button>
+          </div>
+        </div>
+      </div>
+      <footer class="modal-foot">
+        <span></span>
+        <div class="foot-actions">
+          <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+          <button type="submit" class="btn btn-primary" id="loginSave"><span class="spinner"></span><span class="btn-label">Sign in</span></button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ============================ Preview dialog ============================ -->
+  <dialog class="modal modal-xl" id="previewDialog" aria-labelledby="previewTeam">
+    <div class="preview-shell">
+      <header class="preview-head">
+        <div class="preview-title">
+          <span class="seq" id="previewSeq">#01</span>
+          <div>
+            <h2 id="previewTeam">Team</h2>
+            <p id="previewProject">Project</p>
+          </div>
+        </div>
+        <div class="segmented device-switch" id="deviceSwitch" role="tablist" aria-label="Device">
+          <button type="button" data-device="desktop" title="Desktop · 100%"><svg class="i"><use href="#i-monitor" /></svg><span>Desktop</span></button>
+          <button type="button" data-device="tablet" title="Tablet · 768px"><svg class="i"><use href="#i-tablet" /></svg><span>Tablet</span></button>
+          <button type="button" data-device="mobile" title="Mobile · 390px"><svg class="i"><use href="#i-phone" /></svg><span>Mobile</span></button>
+        </div>
+        <div class="preview-actions">
+          <a class="btn btn-secondary btn-sm" id="previewOpen" href="#" target="_blank" rel="noopener noreferrer">
+            <svg class="i"><use href="#i-external" /></svg><span class="hide-sm">Open site</span>
+          </a>
+          <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="i"><use href="#i-x" /></svg></button>
+        </div>
+      </header>
+
+      <div class="preview-body">
+        <div class="stage">
+          <div class="device" id="device" data-device="desktop">
+            <div class="device-bar">
+              <span class="dots"><i></i><i></i><i></i></span>
+              <span class="device-url"><svg class="i"><use href="#i-lock" /></svg><span id="deviceUrl"></span></span>
+              <span class="device-width" id="deviceWidth">100%</span>
+            </div>
+            <div class="device-screen">
+              <iframe id="previewFrame" title="Deployment preview" referrerpolicy="no-referrer"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
+              <div class="frame-loading" id="frameLoading"><span class="spinner lg"></span><span>Loading deployment…</span></div>
+              <div class="frame-blocked" id="frameBlocked" hidden>
+                <span class="blocked-icon"><svg class="i"><use href="#i-alert" /></svg></span>
+                <h3>This site can't be embedded</h3>
+                <p id="frameBlockedReason">The deployment blocks iframes via X-Frame-Options or CSP.</p>
+                <a class="btn btn-primary" id="frameBlockedOpen" href="#" target="_blank" rel="noopener noreferrer">
+                  <svg class="i"><use href="#i-external" /></svg> Open in new tab
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <aside class="preview-side" id="previewSide">
+          <section class="side-block">
+            <h4>Evaluation</h4>
+            <div class="side-eval" id="previewEval"></div>
+          </section>
+
+          <section class="side-block teacher-only">
+            <h4>Quick grade</h4>
+            <div class="score-editor stacked" data-score-editor>
+              <div class="score-inputs">
+                <div class="score-row">
+                  <input id="qScore" type="number" min="0" max="10" step="0.1" placeholder="—" class="score-number" aria-label="Score" />
+                  <input type="range" min="0" max="10" step="0.1" value="0" class="score-range" aria-label="Score slider" />
+                </div>
+              </div>
+              <div class="score-preview"></div>
+            </div>
+            <textarea id="qNotes" rows="3" maxlength="2000" placeholder="Reviewer notes (private)"></textarea>
+            <div class="side-actions">
+              <button type="button" class="btn btn-primary btn-block" id="qSave"><span class="spinner"></span><span class="btn-label">Save score</span></button>
+              <button type="button" class="btn btn-secondary btn-block" id="qSaveNext"><span class="btn-label">Save &amp; next pending</span><svg class="i"><use href="#i-arrow" /></svg></button>
+            </div>
+          </section>
+
+          <section class="side-block student-only">
+            <div class="side-hint">
+              <svg class="i"><use href="#i-lock" /></svg>
+              <p>Faculty can grade directly from this preview. <button type="button" class="link-btn" id="previewLogin">Sign in</button></p>
+            </div>
+          </section>
+
+          <section class="side-block">
+            <h4>Team</h4>
+            <div class="member-list" id="previewMembers"></div>
+          </section>
+
+          <section class="side-block">
+            <h4>Details</h4>
+            <dl class="details" id="previewDetails"></dl>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ============================ Rubric dialog ============================ -->
+  <dialog class="modal" id="rubricDialog" aria-labelledby="rubricTitle">
+    <header class="modal-head">
+      <div>
+        <span class="modal-kicker">Transparent grading</span>
+        <h2 id="rubricTitle">Evaluation rubric</h2>
+      </div>
+      <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="i"><use href="#i-x" /></svg></button>
+    </header>
+    <div class="modal-body">
+      <p class="muted rubric-intro">Projects receive a decimal score from <span class="mono">0.0</span> to <span class="mono">10.0</span> (0.1 precision). The score maps automatically to one of five performance tiers.</p>
+      <ol class="rubric" id="rubricList"></ol>
+    </div>
+  </dialog>
+
+  <!-- ============================ Confirm dialog ============================ -->
+  <dialog class="modal modal-sm" id="confirmDialog" aria-labelledby="confirmTitle">
+    <div class="modal-body confirm-body">
+      <span class="confirm-icon"><svg class="i"><use href="#i-trash" /></svg></span>
+      <h2 id="confirmTitle">Delete project?</h2>
+      <p id="confirmText" class="muted"></p>
+    </div>
+    <footer class="modal-foot">
+      <span></span>
+      <div class="foot-actions">
+        <button type="button" class="btn btn-ghost" data-close>Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmOk"><span class="spinner"></span><span class="btn-label">Delete</span></button>
+      </div>
+    </footer>
+  </dialog>
+
+  <div class="toasts" id="toasts" aria-live="assertive"></div>
+
+  <!-- ============================ Icon sprite ============================ -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+      <symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.8-1.2"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></symbol>
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-github" viewBox="0 0 24 24"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></symbol>
+      <symbol id="i-deploy" viewBox="0 0 24 24"><path d="M12 3.5 21.5 20h-19z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+      <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+      <symbol id="i-tablet" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+      <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5M2 12l10 5 10-5"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2-6.2 3.2 1.2-6.8-5-4.9 6.9-1z"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></symbol>
+      <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+      <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    </defs>
+  </svg>
+
+  <script src="/app.js"></script>
+</body>
+</html>
