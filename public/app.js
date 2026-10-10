@@ -410,10 +410,12 @@
     const pct = Math.min(100, Math.round((s.students / cap) * 100));
     const cols = cap <= 16 ? cap : cap <= 64 ? 16 : 20;
     // A seat per student reads well up to ~160 seats; beyond that use a bar.
+    // Final state is always rendered; the intro is a pure CSS animation, so it
+    // never depends on animation frames (which pause in background tabs).
     const seats = cap <= 160
-      ? `<div class="seats" style="--cols:${cols}" role="img" aria-label="${filled} of ${cap} seats taken">${
-          Array.from({ length: cap }, (_, i) => `<i class="${i < filled && !intro ? 'on' : ''}" style="--sd:${i * 14}ms"></i>`).join('')}</div>`
-      : `<div class="seats-bar"><span style="width:${intro ? 0 : pct}%"></span></div>`;
+      ? `<div class="seats ${intro ? 'intro' : ''}" style="--cols:${cols}" role="img" aria-label="${filled} of ${cap} seats taken">${
+          Array.from({ length: cap }, (_, i) => `<i class="${i < filled ? 'on' : ''}" style="--sd:${i * 14}ms"></i>`).join('')}</div>`
+      : `<div class="seats-bar ${intro ? 'intro' : ''}"><span style="width:${pct}%"></span></div>`;
 
     $('#cohort').innerHTML = `
       <div class="cohort-top">
@@ -426,14 +428,6 @@
         <span><strong>${Math.max(0, cap - s.students)}</strong> seats remaining</span>
         <span><strong>${pct}%</strong> enrolled</span>
       </div>`;
-
-    if (intro) {
-      requestAnimationFrame(() => requestAnimationFrame(() => {
-        $$('#cohort .seats i').forEach((cell, i) => cell.classList.toggle('on', i < filled));
-        const bar = $('#cohort .seats-bar span');
-        if (bar) bar.style.width = `${pct}%`;
-      }));
-    }
   }
 
   function renderStats() {
