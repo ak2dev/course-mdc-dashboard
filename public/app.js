@@ -305,6 +305,7 @@
     const s = state.settings;
     $('#brandName').textContent = s.courseName;
     $('#footerName').textContent = s.courseName;
+    $('#footerMark').textContent = s.courseName;
     $('#lede').textContent = `Submissions, live device previews and tiered evaluations for the ${s.courseName} cohort.`;
     document.title = `${s.courseName} · Project Showcase`;
 
@@ -387,46 +388,87 @@
     renderView();
   }
 
+  // Numbers render as data-count targets; the first render animates them up from zero.
+  const counter = (value, decimals = 0) =>
+    `<span data-count="${value}" data-dec="${decimals}">${Number(value).toFixed(decimals)}</span>`;
+
+  function countUp(root) {
+    const start = performance.now();
+    const nodes = $$('[data-count]', root);
+    const ease = (t) => 1 - (1 - t) ** 3;
+    const frame = (now) => {
+      const t = Math.min(1, (now - start) / 900);
+      for (const n of nodes) n.textContent = (Number(n.dataset.count) * ease(t)).toFixed(Number(n.dataset.dec));
+      if (t < 1) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+
+  function renderCohort(s, intro) {
+    const cap = state.capacity;
+    const filled = Math.min(s.students, cap);
+    const pct = Math.min(100, Math.round((s.students / cap) * 100));
+    const cols = cap <= 16 ? cap : cap <= 64 ? 16 : 20;
+    // A seat per student reads well up to ~160 seats; beyond that use a bar.
+    const seats = cap <= 160
+      ? `<div class="seats" style="--cols:${cols}" role="img" aria-label="${filled} of ${cap} seats taken">${
+          Array.from({ length: cap }, (_, i) => `<i class="${i < filled && !intro ? 'on' : ''}" style="--sd:${i * 14}ms"></i>`).join('')}</div>`
+      : `<div class="seats-bar"><span style="width:${intro ? 0 : pct}%"></span></div>`;
+
+    $('#cohort').innerHTML = `
+      <div class="cohort-top">
+        <span class="kicker">Cohort</span>
+        <span class="cohort-live"><i></i>Live</span>
+      </div>
+      <div class="cohort-count"><strong>${counter(s.students)}</strong><span>/ ${cap} students</span></div>
+      ${seats}
+      <div class="cohort-foot">
+        <span><strong>${Math.max(0, cap - s.students)}</strong> seats remaining</span>
+        <span><strong>${pct}%</strong> enrolled</span>
+      </div>`;
+
+    if (intro) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        $$('#cohort .seats i').forEach((cell, i) => cell.classList.toggle('on', i < filled));
+        const bar = $('#cohort .seats-bar span');
+        if (bar) bar.style.width = `${pct}%`;
+      }));
+    }
+  }
+
   function renderStats() {
     const s = computeStats();
-    const cap = state.capacity;
-    const pct = Math.min(100, Math.round((s.students / cap) * 100));
+    const intro = !state.introDone && state.loaded;
     const avgTier = tierOf(s.avg);
     const hidden = resultsHidden();
     const facultyNote = !state.settings.resultsPublished && isTeacher() ? ' · hidden from students' : '';
-    el.stats.innerHTML = `
-      <article class="card stat capacity">
-        <div class="stat-head"><span>Course enrollment</span><span class="stat-icon">${icon('users')}</span></div>
-        <div class="stat-value">${s.students}<small>/ ${cap} students registered</small></div>
-        <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${cap}" aria-valuenow="${s.students}"><span style="width:${pct}%"></span></div>
-        <div class="progress-ticks"><span>${pct}% of cohort</span><span>${Math.max(0, cap - s.students)} seats remaining</span></div>
-      </article>
-      <article class="card stat">
-        <div class="stat-head"><span>Teams</span><span class="stat-icon">${icon('layers')}</span></div>
-        <div class="stat-value">${s.teams}</div>
-        <div class="stat-sub"><strong>${s.avgTeam ? s.avgTeam.toFixed(1) : '0'}</strong> members per team</div>
-      </article>
-      <article class="card stat">
-        <div class="stat-head"><span>Graded</span><span class="stat-icon">${icon('check')}</span></div>
-        ${hidden
-          ? '<div class="stat-value">—</div><div class="stat-sub">shown when results are published</div>'
-          : `<div class="stat-value">${s.graded}<small>/ ${s.teams}</small></div>
-             <div class="stat-sub">${s.teams ? Math.round((s.graded / s.teams) * 100) : 0}% evaluated</div>`}
-      </article>
-      <article class="card stat">
-        <div class="stat-head"><span>Pending review</span><span class="stat-icon">${icon('clock')}</span></div>
-        ${hidden
-          ? '<div class="stat-value">—</div><div class="stat-sub">evaluations in progress</div>'
-          : `<div class="stat-value">${s.pending}</div>
-             <div class="stat-sub">${s.pending ? 'awaiting faculty review' : 'all caught up'}</div>`}
-      </article>
-      <article class="card stat tier-${hidden ? 'pending' : avgTier.key}">
-        <div class="stat-head"><span>Class average</span><span class="stat-icon">${icon(hidden ? 'eye-off' : 'star')}</span></div>
-        <div class="stat-value">${hidden ? '—' : fmtScore(s.avg)}<small>/ 10</small></div>
-        <div class="stat-sub">${hidden
-          ? 'Not yet published'
-          : s.avg === null ? `No scores yet${facultyNote}` : `<span class="stat-tier">${esc(avgTier.label)}</span>${esc(facultyNote)}`}</div>
+    const stat = (label, iconName, value, sub, cls = '') => `
+      <article class="stat ${cls}">
+        <div class="stat-head"><span>${label}</span><span class="stat-icon">${icon(iconName)}</span></div>
+        <div class="stat-value">${value}</div>
+        <div class="stat-sub">${sub}</div>
       </article>`;
+
+    renderCohort(s, intro);
+    el.stats.innerHTML = [
+      stat('Teams', 'layers', counter(s.teams), `<strong>${s.avgTeam ? s.avgTeam.toFixed(1) : '0'}</strong> members per team`),
+      hidden
+        ? stat('Graded', 'check', '—', 'shown when results are published')
+        : stat('Graded', 'check', `${counter(s.graded)}<small>/ ${s.teams}</small>`, `${s.teams ? Math.round((s.graded / s.teams) * 100) : 0}% evaluated`),
+      hidden
+        ? stat('Pending', 'clock', '—', 'evaluations in progress')
+        : stat('Pending', 'clock', counter(s.pending), s.pending ? 'awaiting faculty review' : 'all caught up'),
+      stat('Class average', hidden ? 'eye-off' : 'star',
+        `${hidden || s.avg === null ? '—' : counter(s.avg, 1)}<small>/ 10</small>`,
+        hidden ? 'not yet published'
+          : s.avg === null ? `no scores yet${facultyNote}` : `<span class="stat-tier">${esc(avgTier.label)}</span>${esc(facultyNote)}`,
+        `tier-${hidden ? 'pending' : avgTier.key}`),
+    ].join('');
+
+    if (intro) {
+      state.introDone = true;
+      countUp(document);
+    }
   }
 
   function renderChips() {
@@ -444,12 +486,23 @@
     }).join('');
   }
 
+  function renderSectionMeta() {
+    const total = state.projects.length;
+    const shown = visibleProjects().length;
+    const filtered = state.filter !== 'all' || state.query.trim();
+    $('#sectionMeta').innerHTML = !state.loaded ? ''
+      : filtered
+        ? `Showing <strong>${shown}</strong> of ${total} team${total === 1 ? '' : 's'}`
+        : `<strong>${total}</strong> team${total === 1 ? '' : 's'} · <strong>${computeStats().students}</strong> students`;
+  }
+
   function renderView() {
     $$('#viewSwitch button').forEach((b) => {
       const on = b.dataset.view === state.view;
       b.classList.toggle('active', on);
       b.setAttribute('aria-selected', on);
     });
+    renderSectionMeta();
 
     if (!state.loaded) {
       el.view.innerHTML = `<div class="card">${Array.from({ length: 6 }, () =>
@@ -501,8 +554,22 @@
     return `<a class="link-pill" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.githubUrl)}">${icon('github')}<span>${esc(repoPath(p.githubUrl))}</span></a>`;
   }
 
+  // Overlapping avatars (each one filters by that student) followed by first names.
+  function people(members) {
+    const first = (m) => m.split(/\s+/)[0];
+    const shown = members.slice(0, 2).map(first).join(', ');
+    const extra = members.length > 2 ? ` <em>+${members.length - 2}</em>` : '';
+    return `<div class="people">
+      <div class="avatar-stack">${members.slice(0, 3).map((m) =>
+        `<button type="button" class="avatar-btn" data-action="member" data-member="${esc(m)}" title="${esc(m)}">${avatar(m)}</button>`).join('')}</div>
+      <span class="people-names" title="${esc(members.join(', '))}">${esc(shown)}${extra}</span>
+    </div>`;
+  }
+
   function evalCell(p) {
-    const inner = `${badge(p.score)}<span class="score ${p.score === null ? 'empty' : ''}">${fmtScore(p.score)}</span>`;
+    const inner = p.score === null
+      ? '<span class="awaiting">Awaiting review</span>'
+      : `${badge(p.score)}<span class="score">${fmtScore(p.score)}</span>`;
     return isTeacher()
       ? `<button type="button" class="eval" data-action="grade" data-id="${p.id}" title="Grade in preview">${inner}</button>`
       : `<span class="eval">${inner}</span>`;
@@ -529,7 +596,7 @@
             <tr style="animation-delay:${Math.min(i, 20) * 22}ms">
               <td><span class="seq">${seqLabel(seq.get(p.id))}</span></td>
               <td class="team-cell"><strong>${esc(p.teamName)}</strong><time datetime="${esc(p.createdAt)}" title="${esc(absTime(p.createdAt))}">Submitted ${relTime(p.createdAt)}</time></td>
-              <td class="members-cell">${memberChips(p.members, 2)}</td>
+              <td class="members-cell">${people(p.members)}</td>
               <td class="project-cell"><strong>${esc(p.title)}</strong>${p.techStack ? `<span class="stack" title="${esc(p.techStack)}">${esc(p.techStack)}</span>` : ''}</td>
               <td>${deployLink(p)}</td>
               <td>${repoLink(p)}</td>
@@ -1533,6 +1600,21 @@
   });
 
   // Live refresh so faculty see new submissions without reloading.
+  // Top bar gains a hairline after scrolling; the filter bar docks beneath it.
+  const topbar = $('.topbar');
+  const toolbar = $('#toolbar');
+  function onScroll() {
+    document.body.classList.toggle('scrolled', window.scrollY > 8);
+    toolbar.classList.toggle('stuck', toolbar.getBoundingClientRect().top <= topbar.offsetHeight + 0.5);
+  }
+  function measureTopbar() {
+    document.documentElement.style.setProperty('--topbar-h', `${topbar.offsetHeight}px`);
+    onScroll();
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', measureTopbar);
+  measureTopbar();
+
   setInterval(() => { if (!document.hidden) loadProjects({ silent: true }); }, 30000);
   // Keep the deadline countdown and open/closed state current between refreshes.
   setInterval(() => {
