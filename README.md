@@ -23,7 +23,7 @@ vercel.json      Output dir, bom1 region, /api rewrite, security headers
 | ------------------ | ----------------- | ----------------- | ------- |
 | `MONGODB_URI`      | On Vercel         | none              | Atlas connection string |
 | `MONGODB_DB`       | No                | `course_mdc`      | Database name |
-| `TEACHER_PASSWORD` | Strongly advised  | `mdc@teacher2026` | Instructor key for faculty mode |
+| `TEACHER_PASSWORD` | Strongly advised  | `***************` | Instructor key for faculty mode |
 
 The default password is published in the project spec, so set your own before the site goes public.
 
