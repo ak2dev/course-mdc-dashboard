@@ -4,3 +4,4 @@ scripts
 server.js
 .env*
 .claude
+tests

@@ -13,6 +13,7 @@ lib/store.js     Storage: MongoDB when MONGODB_URI is set, else data/projects.js
 public/          Frontend (served as static files)
 server.js        Local dev server (static files + the same API handler)
 scripts/seed.js  Seed, reset or import data
+tests/smoke.js   End-to-end API tests (npm test)
 vercel.json      Output dir, bom1 region, /api rewrite, security headers
 ```
 
@@ -54,6 +55,30 @@ Open http://localhost:3000. Without a `.env.local` file, data is stored in `data
 
 These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherwise. When using the JSON file, stop the server before running them.
 
+## Control Center (faculty)
+
+After signing in, faculty get a **Control** button in the top bar. Every setting is enforced by the API, not just hidden in the page.
+
+| Section | What it controls |
+| --- | --- |
+| Overview | Live status with one-click toggles to open/close submissions and publish/hide results |
+| Submissions | Accept submissions on/off, an automatic deadline, course capacity, maximum team size |
+| Results | Publish or hide scores. While hidden, students see every project as Pending, a locked leaderboard and no class average; faculty views are unchanged |
+| Course | Course name (top bar, footer, page title) and an announcement banner shown to everyone |
+| Activity | Log of sign-ins, submissions, grades, edits, deletions and setting changes, kept for 180 days |
+| Danger zone | CSV backup, sign out all faculty, clear all scores (type `RESET`), delete all projects (type `DELETE`) |
+
+Faculty can still add or edit teams while submissions are closed, and their edits aren't limited by team size or capacity. Settings live in the `settings` collection and the log in `activity`.
+
+## Testing
+
+```bash
+npm test                                          # against http://localhost:3000
+BASE_URL=https://your-app.vercel.app npm test     # against a deployment
+```
+
+This runs 47 end-to-end API checks covering the core API and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`). Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
+
 ## How it works on serverless
 
 - **Faculty sessions** are random tokens sent in the `x-teacher-token` header and kept only in page memory. The server stores a SHA-256 hash of each token in the `sessions` collection, which expires entries after 12 hours, so any function instance can check a token and signing out revokes it.
@@ -73,3 +98,10 @@ These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherw
 | `POST`   | `/api/auth/login`       | body `{ "password": "…" }` |
 | `POST`   | `/api/auth/logout`      | faculty |
 | `GET`    | `/api/frame-check?url=` | public  |
+| `PATCH`  | `/api/admin/settings`   | faculty |
+| `GET`    | `/api/admin/activity?limit=` | faculty |
+| `POST`   | `/api/admin/reset-scores` | faculty, body `{ "confirm": "RESET" }` |
+| `POST`   | `/api/admin/delete-all` | faculty, body `{ "confirm": "DELETE" }` |
+| `POST`   | `/api/admin/revoke-sessions` | faculty |
+
+`GET /api/projects` also returns the current `settings`, including a computed `accepting` flag.

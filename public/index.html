@@ -21,7 +21,7 @@
       <a class="brand" href="/" aria-label="Course MDC home">
         <span class="brand-mark">M</span>
         <span class="brand-text">
-          <strong>Course MDC</strong>
+          <strong id="brandName">Course MDC</strong>
           <small>Showcase &amp; Evaluation</small>
         </span>
       </a>
@@ -37,6 +37,10 @@
           <svg class="i theme-sun"><use href="#i-sun" /></svg>
           <svg class="i theme-moon"><use href="#i-moon" /></svg>
         </button>
+        <button class="btn btn-secondary teacher-only" id="controlBtn" type="button" title="Control Center">
+          <svg class="i"><use href="#i-sliders" /></svg>
+          <span class="label">Control</span>
+        </button>
         <button class="btn btn-secondary" id="facultyBtn" type="button">
           <svg class="i"><use href="#i-lock" /></svg>
           <span class="label">Faculty</span>
@@ -49,13 +53,22 @@
     </div>
   </header>
 
+  <div class="announce" id="announce" role="status" hidden>
+    <div class="container announce-inner">
+      <span class="announce-icon"><svg class="i"><use href="#i-megaphone" /></svg></span>
+      <p id="announceText"></p>
+    </div>
+  </div>
+
   <main class="container">
     <!-- ============================ Hero ============================ -->
     <section class="hero">
       <div>
-        <span class="eyebrow"><i class="pulse"></i> Live board · auto-refreshing</span>
+        <div class="pills" id="statusPills">
+          <span class="eyebrow"><i class="pulse"></i> Live board · auto-refreshing</span>
+        </div>
         <h1>Project <span class="grad-text">Showcase</span></h1>
-        <p class="lede">Submissions, live device previews and tiered evaluations for the Course MDC cohort.</p>
+        <p class="lede" id="lede">Submissions, live device previews and tiered evaluations for the Course MDC cohort.</p>
       </div>
       <div class="hero-actions">
         <button class="btn btn-secondary" type="button" data-open="rubric">
@@ -87,7 +100,7 @@
     <div class="container footer-inner">
       <div class="footer-brand">
         <span class="brand-mark sm">M</span>
-        <span>Course MDC · Project Showcase &amp; Evaluation</span>
+        <span><span id="footerName">Course MDC</span> · Project Showcase &amp; Evaluation</span>
       </div>
       <nav class="footer-links">
         <button type="button" class="link-btn" data-open="rubric">Grading rubric</button>
@@ -127,7 +140,7 @@
             <div class="tags"></div>
             <input id="fMemberInput" placeholder="Type a name, press Enter or comma" autocomplete="off" />
           </div>
-          <p class="hint">Use each student's full name — it's how course capacity is tracked.</p>
+          <p class="hint" id="memberHint">Use each student's full name — it's how course capacity is tracked.</p>
         </div>
 
         <div class="field span-2">
@@ -323,12 +336,166 @@
     </div>
   </dialog>
 
+  <!-- ============================ Control Center ============================ -->
+  <dialog class="modal modal-lg" id="controlDialog" aria-labelledby="controlTitle">
+    <form id="controlForm" novalidate>
+      <header class="modal-head">
+        <div>
+          <span class="modal-kicker">Faculty</span>
+          <h2 id="controlTitle">Control Center</h2>
+        </div>
+        <button type="button" class="icon-btn" data-close aria-label="Close"><svg class="i"><use href="#i-x" /></svg></button>
+      </header>
+
+      <div class="control-shell">
+        <nav class="control-nav" id="controlNav" role="tablist" aria-label="Control Center sections">
+          <button type="button" role="tab" data-tab="overview"><svg class="i"><use href="#i-grid" /></svg><span>Overview</span></button>
+          <button type="button" role="tab" data-tab="submissions"><svg class="i"><use href="#i-calendar" /></svg><span>Submissions</span></button>
+          <button type="button" role="tab" data-tab="results"><svg class="i"><use href="#i-eye" /></svg><span>Results</span></button>
+          <button type="button" role="tab" data-tab="course"><svg class="i"><use href="#i-megaphone" /></svg><span>Course</span></button>
+          <button type="button" role="tab" data-tab="activity"><svg class="i"><use href="#i-activity" /></svg><span>Activity</span></button>
+          <button type="button" role="tab" data-tab="danger" class="nav-danger"><svg class="i"><use href="#i-alert" /></svg><span>Danger zone</span></button>
+        </nav>
+
+        <div class="control-body">
+          <section class="panel" data-panel="overview" role="tabpanel">
+            <div class="panel-head">
+              <h3>Overview</h3>
+              <p>Live status of the course. Quick toggles apply immediately.</p>
+            </div>
+            <div class="overview-grid" id="overviewGrid"></div>
+          </section>
+
+          <section class="panel" data-panel="submissions" role="tabpanel" hidden>
+            <div class="panel-head">
+              <h3>Submissions</h3>
+              <p>Control when and how students can submit projects.</p>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <h4>Accept new submissions</h4>
+                <p>When off, students can't submit. Faculty can still add teams.</p>
+              </div>
+              <label class="switch"><input type="checkbox" name="submissionsOpen" /><span aria-hidden="true"></span><em class="sr-only">Accept new submissions</em></label>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <h4>Submission deadline</h4>
+                <p>Submissions close automatically at this time (your local time zone). Leave empty for no deadline.</p>
+              </div>
+              <div class="setting-control">
+                <input type="datetime-local" name="deadline" aria-label="Submission deadline" />
+                <button type="button" class="btn btn-ghost btn-sm" id="clearDeadline">Clear</button>
+              </div>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <h4>Course capacity</h4>
+                <p>Maximum number of unique students who can register.</p>
+              </div>
+              <div class="setting-control"><input type="number" name="capacity" min="1" max="500" step="1" aria-label="Course capacity" /><span class="unit">students</span></div>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <h4>Maximum team size</h4>
+                <p>Applies to student submissions. Faculty edits aren't limited.</p>
+              </div>
+              <div class="setting-control"><input type="number" name="maxTeamSize" min="1" max="20" step="1" aria-label="Maximum team size" /><span class="unit">members</span></div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="results" role="tabpanel" hidden>
+            <div class="panel-head">
+              <h3>Results</h3>
+              <p>Decide when students can see scores and rankings.</p>
+            </div>
+            <div class="setting">
+              <div class="setting-text">
+                <h4>Publish results to students</h4>
+                <p>When off, students see every project as <strong>Pending</strong>, the leaderboard is locked and the class average is hidden. You can keep grading in the meantime.</p>
+              </div>
+              <label class="switch"><input type="checkbox" name="resultsPublished" /><span aria-hidden="true"></span><em class="sr-only">Publish results</em></label>
+            </div>
+            <div class="callout" id="resultsCallout"></div>
+          </section>
+
+          <section class="panel" data-panel="course" role="tabpanel" hidden>
+            <div class="panel-head">
+              <h3>Course</h3>
+              <p>Branding and announcements shown to everyone.</p>
+            </div>
+            <div class="field">
+              <label for="cCourseName">Course name</label>
+              <input id="cCourseName" name="courseName" maxlength="60" required />
+            </div>
+            <div class="field">
+              <div class="label-row">
+                <label for="cAnnouncement">Announcement banner</label>
+                <span class="member-count" id="announceCount">0 / 280</span>
+              </div>
+              <textarea id="cAnnouncement" name="announcement" rows="3" maxlength="280" placeholder="e.g. Final demos are on Friday at 10:00 in Lab 3."></textarea>
+              <p class="hint">Shown at the top of the dashboard for everyone. Leave empty to hide it.</p>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="activity" role="tabpanel" hidden>
+            <div class="panel-head row">
+              <div>
+                <h3>Activity log</h3>
+                <p>Recent faculty and student actions (kept for 180 days).</p>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm" id="activityRefresh"><svg class="i"><use href="#i-refresh" /></svg> Refresh</button>
+            </div>
+            <ol class="activity" id="activityList"></ol>
+          </section>
+
+          <section class="panel" data-panel="danger" role="tabpanel" hidden>
+            <div class="panel-head">
+              <h3>Danger zone</h3>
+              <p>Bulk actions. Export a CSV backup before using them.</p>
+            </div>
+            <div class="danger-list">
+              <div class="setting">
+                <div class="setting-text"><h4>Export grade backup</h4><p>Download every team, link, score and reviewer note as CSV.</p></div>
+                <button type="button" class="btn btn-secondary btn-sm" data-export><svg class="i"><use href="#i-download" /></svg> Export CSV</button>
+              </div>
+              <div class="setting">
+                <div class="setting-text"><h4>Sign out all faculty</h4><p>Ends every faculty session on every device, including this one.</p></div>
+                <button type="button" class="btn btn-secondary btn-sm" data-danger="revoke">Sign out everyone</button>
+              </div>
+              <div class="setting">
+                <div class="setting-text"><h4>Clear all scores</h4><p>Moves every project back to Pending. Reviewer notes are kept.</p></div>
+                <button type="button" class="btn btn-danger-outline btn-sm" data-danger="reset">Clear scores</button>
+              </div>
+              <div class="setting">
+                <div class="setting-text"><h4>Delete all projects</h4><p>Permanently removes every submission and evaluation.</p></div>
+                <button type="button" class="btn btn-danger btn-sm" data-danger="delete">Delete all</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <footer class="modal-foot control-foot">
+        <p class="foot-note" id="controlStatus">All changes saved</p>
+        <div class="foot-actions">
+          <button type="button" class="btn btn-ghost" id="controlDiscard" disabled>Discard</button>
+          <button type="submit" class="btn btn-primary" id="controlSave" disabled><span class="spinner"></span><span class="btn-label">Save changes</span></button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
   <!-- ============================ Confirm dialog ============================ -->
   <dialog class="modal modal-sm" id="confirmDialog" aria-labelledby="confirmTitle">
     <div class="modal-body confirm-body">
-      <span class="confirm-icon"><svg class="i"><use href="#i-trash" /></svg></span>
+      <span class="confirm-icon"><svg class="i"><use id="confirmIcon" href="#i-trash" /></svg></span>
       <h2 id="confirmTitle">Delete project?</h2>
       <p id="confirmText" class="muted"></p>
+      <div class="field confirm-type" id="confirmTypeField" hidden>
+        <label for="confirmType">Type <strong class="mono" id="confirmWord"></strong> to confirm</label>
+        <input id="confirmType" autocomplete="off" spellcheck="false" />
+      </div>
     </div>
     <footer class="modal-foot">
       <span></span>
@@ -376,6 +543,12 @@
       <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
       <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
       <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+      <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+      <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+      <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+      <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 8 10 8a18.5 18.5 0 0 1-2.2 3.2M6.6 6.6A18.3 18.3 0 0 0 2 12s3.5 8 10 8a9.7 9.7 0 0 0 5.4-1.6"/><path d="m2 2 20 20"/><path d="M14.1 14.1a3 3 0 1 1-4.2-4.2"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
     </defs>
   </svg>

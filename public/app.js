@@ -22,8 +22,19 @@
   const FILTERS = [{ key: 'all', chip: 'All' }, ...TIERS, PENDING];
   const DEVICES = { desktop: '100%', tablet: '768px', mobile: '390px' };
 
+  const DEFAULT_SETTINGS = {
+    courseName: 'Course MDC',
+    submissionsOpen: true,
+    deadline: null,
+    capacity: 64,
+    maxTeamSize: 8,
+    resultsPublished: true,
+    announcement: '',
+  };
+
   const state = {
     projects: [],
+    settings: { ...DEFAULT_SETTINGS },
     capacity: 64,
     token: null, // kept in memory only
     loaded: false,
@@ -33,7 +44,8 @@
     device: DEVICES[store.get('mdc-device')] ? store.get('mdc-device') : 'desktop',
     previewId: null,
     editingId: null,
-    deletingId: null,
+    confirmHandler: null,
+    controlTab: 'overview',
     afterLogin: null,
     lastPayload: '',
   };
@@ -58,6 +70,9 @@
     device: $('#device'),
     rubricDialog: $('#rubricDialog'),
     confirmDialog: $('#confirmDialog'),
+    controlDialog: $('#controlDialog'),
+    controlForm: $('#controlForm'),
+    controlSave: $('#controlSave'),
     toasts: $('#toasts'),
   };
 
@@ -231,10 +246,10 @@
         setToken(null, { reload: false });
         toast('Faculty session ended', 'The server was restarted. Sign in again to grade.', 'info');
       }
-      const payload = JSON.stringify(data.projects);
-      state.capacity = data.capacity || 64;
+      const payload = JSON.stringify([data.projects, data.settings]);
       const changed = payload !== state.lastPayload || !state.loaded;
       state.lastPayload = payload;
+      applySettings(data.settings);
       state.projects = data.projects.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       state.loaded = true;
       if (changed) render();
@@ -245,6 +260,74 @@
         render();
       }
     }
+  }
+
+  /* ============================================================= settings */
+
+  function applySettings(settings) {
+    state.settings = { ...DEFAULT_SETTINGS, ...(settings || {}) };
+    state.capacity = state.settings.capacity;
+  }
+
+  // Mirrors the server rule; the server stays authoritative.
+  const isAccepting = (s = state.settings) =>
+    Boolean(s.submissionsOpen) && (!s.deadline || Date.now() < Date.parse(s.deadline));
+
+  const resultsHidden = () => !state.settings.resultsPublished && !isTeacher();
+  const maxMembers = () => (isTeacher() ? 20 : state.settings.maxTeamSize);
+
+  function fmtDeadline(iso) {
+    return new Date(iso).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function countdown(iso) {
+    const ms = Date.parse(iso) - Date.now();
+    if (ms <= 0) return 'passed';
+    const m = Math.floor(ms / 60000);
+    const d = Math.floor(m / 1440);
+    const h = Math.floor((m % 1440) / 60);
+    if (d > 0) return `in ${d}d ${h}h`;
+    if (h > 0) return `in ${h}h ${m % 60}m`;
+    return m > 0 ? `in ${m}m` : 'in under a minute';
+  }
+
+  function submissionStatus(s = state.settings) {
+    if (!s.submissionsOpen) return { open: false, label: 'Submissions closed', detail: '' };
+    if (s.deadline && Date.now() >= Date.parse(s.deadline)) {
+      return { open: false, label: 'Submissions closed', detail: `deadline passed ${fmtDeadline(s.deadline)}` };
+    }
+    if (s.deadline) return { open: true, label: 'Submissions open', detail: `closes ${fmtDeadline(s.deadline)} · ${countdown(s.deadline)}` };
+    return { open: true, label: 'Submissions open', detail: '' };
+  }
+
+  // Course name, banner, status pills and submit button state.
+  function renderChrome() {
+    const s = state.settings;
+    $('#brandName').textContent = s.courseName;
+    $('#footerName').textContent = s.courseName;
+    $('#lede').textContent = `Submissions, live device previews and tiered evaluations for the ${s.courseName} cohort.`;
+    document.title = `${s.courseName} · Project Showcase`;
+
+    $('#announce').hidden = !s.announcement;
+    $('#announceText').textContent = s.announcement;
+
+    const status = submissionStatus();
+    const pills = [
+      `<span class="eyebrow ${status.open ? '' : 'is-closed'}"><i class="pulse"></i><strong>${esc(status.label)}</strong>${
+        status.detail ? `<span>· ${esc(status.detail)}</span>` : ''}</span>`,
+    ];
+    if (!s.resultsPublished) {
+      pills.push(`<span class="eyebrow">${icon('eye-off')}${isTeacher() ? 'Results hidden from students' : 'Results not yet published'}</span>`);
+    }
+    $('#statusPills').innerHTML = pills.join('');
+
+    const btn = $('#submitBtn');
+    const locked = !status.open && !isTeacher();
+    btn.classList.toggle('is-disabled', locked);
+    btn.setAttribute('aria-disabled', String(locked));
+    btn.innerHTML = locked
+      ? `${icon('lock')}<span class="hide-sm">Submissions closed</span>`
+      : `${icon('plus')}<span class="hide-sm">Submit project</span>`;
   }
 
   /* =============================================================== derive */
@@ -298,6 +381,7 @@
   /* =============================================================== render */
 
   function render() {
+    renderChrome();
     renderStats();
     renderChips();
     renderView();
@@ -308,6 +392,8 @@
     const cap = state.capacity;
     const pct = Math.min(100, Math.round((s.students / cap) * 100));
     const avgTier = tierOf(s.avg);
+    const hidden = resultsHidden();
+    const facultyNote = !state.settings.resultsPublished && isTeacher() ? ' · hidden from students' : '';
     el.stats.innerHTML = `
       <article class="card stat capacity">
         <div class="stat-head"><span>Course enrollment</span><span class="stat-icon">${icon('users')}</span></div>
@@ -322,18 +408,24 @@
       </article>
       <article class="card stat">
         <div class="stat-head"><span>Graded</span><span class="stat-icon">${icon('check')}</span></div>
-        <div class="stat-value">${s.graded}<small>/ ${s.teams}</small></div>
-        <div class="stat-sub">${s.teams ? Math.round((s.graded / s.teams) * 100) : 0}% evaluated</div>
+        ${hidden
+          ? '<div class="stat-value">—</div><div class="stat-sub">shown when results are published</div>'
+          : `<div class="stat-value">${s.graded}<small>/ ${s.teams}</small></div>
+             <div class="stat-sub">${s.teams ? Math.round((s.graded / s.teams) * 100) : 0}% evaluated</div>`}
       </article>
       <article class="card stat">
         <div class="stat-head"><span>Pending review</span><span class="stat-icon">${icon('clock')}</span></div>
-        <div class="stat-value">${s.pending}</div>
-        <div class="stat-sub">${s.pending ? 'awaiting faculty review' : 'all caught up'}</div>
+        ${hidden
+          ? '<div class="stat-value">—</div><div class="stat-sub">evaluations in progress</div>'
+          : `<div class="stat-value">${s.pending}</div>
+             <div class="stat-sub">${s.pending ? 'awaiting faculty review' : 'all caught up'}</div>`}
       </article>
-      <article class="card stat tier-${avgTier.key}">
-        <div class="stat-head"><span>Class average</span><span class="stat-icon">${icon('star')}</span></div>
-        <div class="stat-value">${fmtScore(s.avg)}<small>/ 10</small></div>
-        <div class="stat-sub">${s.avg === null ? 'No scores yet' : `<span class="stat-tier">${esc(avgTier.label)}</span>`}</div>
+      <article class="card stat tier-${hidden ? 'pending' : avgTier.key}">
+        <div class="stat-head"><span>Class average</span><span class="stat-icon">${icon(hidden ? 'eye-off' : 'star')}</span></div>
+        <div class="stat-value">${hidden ? '—' : fmtScore(s.avg)}<small>/ 10</small></div>
+        <div class="stat-sub">${hidden
+          ? 'Not yet published'
+          : s.avg === null ? `No scores yet${facultyNote}` : `<span class="stat-tier">${esc(avgTier.label)}</span>${esc(facultyNote)}`}</div>
       </article>`;
   }
 
@@ -489,6 +581,11 @@
     const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
     const ordinal = { 1: '1st', 2: '2nd', 3: '3rd' };
 
+    if (resultsHidden()) {
+      el.view.innerHTML = emptyState('lock', 'Results haven’t been published yet',
+        'Faculty will publish scores and rankings once evaluations are complete. Check back soon.');
+      return;
+    }
     if (state.filter === 'pending') {
       el.view.innerHTML = emptyState('clock', 'Pending projects aren’t ranked yet',
         `${pendingCount} project${pendingCount === 1 ? ' is' : 's are'} awaiting review. They join the leaderboard once scored.`,
@@ -617,7 +714,7 @@
 
     function add(raw) {
       raw.split(/[,\n]/).map((s) => s.trim().replace(/\s+/g, ' ').slice(0, 48)).filter(Boolean).forEach((name) => {
-        if (!tags.some((t) => t.toLowerCase() === name.toLowerCase()) && tags.length < 8) tags.push(name);
+        if (!tags.some((t) => t.toLowerCase() === name.toLowerCase()) && tags.length < maxMembers()) tags.push(name);
       });
       paint();
     }
@@ -630,7 +727,10 @@
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ',') {
         e.preventDefault();
-        if (tags.length >= 8 && input.value.trim()) toast('Team is full', 'A team can have at most 8 members.', 'info');
+        const max = maxMembers();
+        if (tags.length >= max && input.value.trim()) {
+          toast('Team is full', `A team can have at most ${max} member${max === 1 ? '' : 's'}.`, 'info');
+        }
         commit();
       } else if (e.key === 'Backspace' && !input.value && tags.length) {
         tags.pop();
@@ -673,8 +773,17 @@
   });
 
   function openSubmit(project = null) {
+    if (!project && !isTeacher() && !isAccepting()) {
+      const status = submissionStatus();
+      toast('Submissions are closed', status.detail ? `The ${status.detail}.` : 'Faculty have closed new submissions.', 'error');
+      return;
+    }
     state.editingId = project?.id || null;
     const f = el.submitForm;
+    const max = maxMembers();
+    $('#memberHint').textContent = isTeacher()
+      ? 'Use each student’s full name — it’s how course capacity is tracked.'
+      : `Up to ${max} member${max === 1 ? '' : 's'}. Use each student’s full name — it’s how course capacity is tracked.`;
     f.reset();
     $$('.field.invalid', f).forEach((n) => n.classList.remove('invalid'));
     $('#submitKicker').textContent = project ? 'Faculty · Edit' : 'New submission';
@@ -745,6 +854,8 @@
       await loadProjects();
     } catch (err) {
       toast('Could not save project', err.message, 'error');
+      // Settings may have changed (e.g. submissions just closed).
+      loadProjects({ silent: true });
     } finally {
       setBusy(el.submitSave, false);
     }
@@ -763,6 +874,7 @@
       ? `<span class="dot"></span><span class="label">Faculty</span>${icon('logout')}`
       : `${icon('lock')}<span class="label">Faculty</span>`;
     $('#footerFaculty').textContent = token ? 'Sign out' : 'Faculty access';
+    if (!token && el.controlDialog.open) el.controlDialog.close();
     if (reload) loadProjects({ silent: true });
     else render();
     if (state.previewId && el.previewDialog.open) fillPreview(find(state.previewId));
@@ -839,30 +951,302 @@
     }
   }
 
-  /* =============================================================== delete */
+  /* ============================================================== confirm */
+
+  // Generic confirmation dialog. `requireText` makes the user type a word first.
+  function confirmAction({ title, text, okLabel = 'Delete', busyLabel = 'Working…', iconName = 'trash', requireText = null, onConfirm }) {
+    const ok = $('#confirmOk');
+    const typed = $('#confirmType');
+    $('#confirmTitle').textContent = title;
+    $('#confirmText').textContent = text;
+    $('#confirmIcon').setAttribute('href', `#i-${iconName}`);
+    $('.btn-label', ok).textContent = okLabel;
+    $('#confirmTypeField').hidden = !requireText;
+    $('#confirmWord').textContent = requireText || '';
+    typed.value = '';
+    ok.disabled = Boolean(requireText);
+    state.confirmHandler = { requireText, busyLabel, onConfirm };
+    el.confirmDialog.showModal();
+    setTimeout(() => (requireText ? typed : ok).focus(), 30);
+  }
+
+  async function runConfirm() {
+    const ok = $('#confirmOk');
+    const handler = state.confirmHandler;
+    if (!handler || ok.disabled) return;
+    if (handler.requireText && $('#confirmType').value.trim() !== handler.requireText) return;
+    setBusy(ok, true, handler.busyLabel);
+    try {
+      await handler.onConfirm();
+      el.confirmDialog.close();
+    } catch (err) {
+      toast('Action failed', err.message, 'error');
+    } finally {
+      setBusy(ok, false);
+      ok.disabled = Boolean(handler.requireText) && $('#confirmType').value.trim() !== handler.requireText;
+    }
+  }
 
   function confirmDelete(project) {
     if (!project) return;
-    state.deletingId = project.id;
-    $('#confirmText').textContent = `“${project.teamName} — ${project.title}” and its evaluation will be permanently removed.`;
-    el.confirmDialog.showModal();
+    confirmAction({
+      title: 'Delete project?',
+      text: `“${project.teamName} — ${project.title}” and its evaluation will be permanently removed.`,
+      busyLabel: 'Deleting…',
+      onConfirm: async () => {
+        await api(`/api/projects/${project.id}`, { method: 'DELETE' });
+        toast('Project deleted', `${project.teamName} was removed.`, 'success');
+        await loadProjects();
+      },
+    });
   }
 
-  async function doDelete() {
-    const btn = $('#confirmOk');
-    const project = find(state.deletingId);
-    if (!project || btn.disabled) return;
-    setBusy(btn, true, 'Deleting…');
-    try {
-      await api(`/api/projects/${project.id}`, { method: 'DELETE' });
-      el.confirmDialog.close();
-      toast('Project deleted', `${project.teamName} was removed.`, 'success');
-      await loadProjects();
-    } catch (err) {
-      toast('Could not delete project', err.message, 'error');
-    } finally {
-      setBusy(btn, false);
+  /* ======================================================= control center */
+
+  const SETTING_FIELDS = ['submissionsOpen', 'deadline', 'capacity', 'maxTeamSize', 'resultsPublished', 'courseName', 'announcement'];
+  const ACTIVITY_ICONS = { login: 'lock', submit: 'plus', grade: 'star', edit: 'edit', delete: 'trash', settings: 'sliders', danger: 'alert' };
+
+  const pad = (n) => String(n).padStart(2, '0');
+  function isoToLocalInput(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function readControlForm() {
+    const f = el.controlForm.elements;
+    return {
+      submissionsOpen: f.submissionsOpen.checked,
+      deadline: f.deadline.value ? new Date(f.deadline.value).toISOString() : null,
+      capacity: Number(f.capacity.value),
+      maxTeamSize: Number(f.maxTeamSize.value),
+      resultsPublished: f.resultsPublished.checked,
+      courseName: f.courseName.value.trim(),
+      announcement: f.announcement.value.trim().replace(/\s+/g, ' '),
+    };
+  }
+
+  // Compares at minute precision because datetime-local drops seconds.
+  function controlChanges() {
+    const form = readControlForm();
+    const changes = {};
+    for (const key of SETTING_FIELDS) {
+      const current = state.settings[key];
+      const same = key === 'deadline'
+        ? isoToLocalInput(form.deadline) === isoToLocalInput(current)
+        : form[key] === current;
+      if (!same) changes[key] = form[key];
     }
+    return changes;
+  }
+
+  function updateControlDirty() {
+    const count = Object.keys(controlChanges()).length;
+    const status = $('#controlStatus');
+    status.textContent = count ? `${count} unsaved change${count === 1 ? '' : 's'}` : 'All changes saved';
+    status.classList.toggle('dirty', count > 0);
+    el.controlSave.disabled = count === 0;
+    $('#controlDiscard').disabled = count === 0;
+    $('#announceCount').textContent = `${el.controlForm.elements.announcement.value.length} / 280`;
+    renderResultsCallout();
+  }
+
+  function fillControlForm() {
+    const s = state.settings;
+    const f = el.controlForm.elements;
+    f.submissionsOpen.checked = s.submissionsOpen;
+    f.deadline.value = isoToLocalInput(s.deadline);
+    f.capacity.value = s.capacity;
+    f.maxTeamSize.value = s.maxTeamSize;
+    f.resultsPublished.checked = s.resultsPublished;
+    f.courseName.value = s.courseName;
+    f.announcement.value = s.announcement;
+    updateControlDirty();
+  }
+
+  function renderResultsCallout() {
+    const published = el.controlForm.elements.resultsPublished.checked;
+    $('#resultsCallout').innerHTML = published
+      ? `${icon('eye')}<p><strong>Students currently see</strong> every score, tier badge, the class average and the ranked leaderboard.</p>`
+      : `${icon('eye-off')}<p><strong>Students will see</strong> all projects as Pending, a locked leaderboard and no class average. Faculty views are unchanged.</p>`;
+  }
+
+  function renderOverview() {
+    const s = state.settings;
+    const stats = computeStats();
+    const status = submissionStatus();
+    const pct = Math.min(100, Math.round((stats.students / s.capacity) * 100));
+    $('#overviewGrid').innerHTML = `
+      <div class="ov-card">
+        <span class="ov-label">${icon('calendar')} Submissions</span>
+        <span class="ov-value"><i class="state-dot ${status.open ? '' : 'off'}"></i>${status.open ? 'Open' : 'Closed'}</span>
+        <span class="ov-sub">${esc(status.detail || (s.deadline ? '' : 'No deadline set'))}</span>
+        <button type="button" class="btn btn-secondary btn-sm" data-quick="submissionsOpen">${s.submissionsOpen ? 'Close submissions' : 'Open submissions'}</button>
+      </div>
+      <div class="ov-card">
+        <span class="ov-label">${icon(s.resultsPublished ? 'eye' : 'eye-off')} Results</span>
+        <span class="ov-value"><i class="state-dot ${s.resultsPublished ? '' : 'off'}"></i>${s.resultsPublished ? 'Published' : 'Hidden'}</span>
+        <span class="ov-sub">${s.resultsPublished ? 'Students can see scores and rankings' : 'Students see every project as Pending'}</span>
+        <button type="button" class="btn btn-secondary btn-sm" data-quick="resultsPublished">${s.resultsPublished ? 'Hide results' : 'Publish results'}</button>
+      </div>
+      <div class="ov-card">
+        <span class="ov-label">${icon('users')} Enrollment</span>
+        <span class="ov-value">${stats.students} <span class="muted" style="font-size:14px;font-weight:500">/ ${s.capacity}</span></span>
+        <span class="ov-sub">${stats.teams} team${stats.teams === 1 ? '' : 's'} · max ${s.maxTeamSize} per team</span>
+        <div class="progress"><span style="width:${pct}%"></span></div>
+      </div>
+      <div class="ov-card">
+        <span class="ov-label">${icon('check')} Grading</span>
+        <span class="ov-value">${stats.graded} <span class="muted" style="font-size:14px;font-weight:500">/ ${stats.teams} graded</span></span>
+        <span class="ov-sub">${stats.pending ? `${stats.pending} awaiting review` : 'All caught up'}${stats.avg === null ? '' : ` · average ${fmtScore(stats.avg)}`}</span>
+        <div class="progress"><span style="width:${stats.teams ? Math.round((stats.graded / stats.teams) * 100) : 0}%"></span></div>
+      </div>`;
+  }
+
+  async function loadActivity() {
+    const list = $('#activityList');
+    list.innerHTML = '<li class="activity-empty"><span class="spinner lg" style="margin:0 auto"></span></li>';
+    try {
+      const { activity } = await api('/api/admin/activity?limit=100');
+      list.innerHTML = activity.length
+        ? activity.map((a, i) => `
+          <li class="act act-${esc(a.action)}" style="animation-delay:${Math.min(i, 15) * 20}ms">
+            <span class="act-icon">${icon(ACTIVITY_ICONS[a.action] || 'info')}</span>
+            <div>
+              <p>${esc(a.summary)}${a.meta?.deadline ? ` <span class="muted">(${esc(fmtDeadline(a.meta.deadline))})</span>` : ''}</p>
+              <time datetime="${esc(a.at)}" title="${esc(absTime(a.at))}">${relTime(a.at)}</time>
+            </div>
+            <span class="act-actor ${a.actor === 'faculty' ? 'faculty' : ''}">${esc(a.actor)}</span>
+          </li>`).join('')
+        : '<li class="activity-empty">No activity recorded yet.</li>';
+    } catch (err) {
+      list.innerHTML = `<li class="activity-empty">${esc(err.message)}</li>`;
+    }
+  }
+
+  function showControlTab(tab) {
+    state.controlTab = tab;
+    $$('#controlNav [data-tab]').forEach((b) => {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    $$('#controlDialog [data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
+    if (tab === 'overview') renderOverview();
+    if (tab === 'activity') loadActivity();
+  }
+
+  function openControl(tab = state.controlTab) {
+    if (!isTeacher()) return openLogin(() => openControl(tab));
+    fillControlForm();
+    showControlTab(tab);
+    if (!el.controlDialog.open) el.controlDialog.showModal();
+  }
+
+  async function saveSettings(patch, { quiet = false } = {}) {
+    const { settings } = await api('/api/admin/settings', { method: 'PATCH', body: patch });
+    applySettings(settings);
+    state.lastPayload = '';
+    render();
+    if (!quiet) toast('Settings saved', 'Changes are live for everyone.', 'success');
+    return settings;
+  }
+
+  async function onControlSave(e) {
+    e.preventDefault();
+    const changes = controlChanges();
+    if (!Object.keys(changes).length || el.controlSave.disabled) return;
+    if ('courseName' in changes && !changes.courseName) {
+      showControlTab('course');
+      toast('Course name is required', '', 'error');
+      return;
+    }
+    setBusy(el.controlSave, true, 'Saving…');
+    try {
+      await saveSettings(changes);
+      fillControlForm();
+      if (state.controlTab === 'overview') renderOverview();
+    } catch (err) {
+      toast('Could not save settings', err.message, 'error');
+    } finally {
+      setBusy(el.controlSave, false);
+      updateControlDirty();
+    }
+  }
+
+  // Overview quick toggles save one field immediately and keep other edits intact.
+  async function quickToggle(key, btn) {
+    btn.disabled = true;
+    try {
+      const next = !state.settings[key];
+      await saveSettings({ [key]: next }, { quiet: true });
+      el.controlForm.elements[key].checked = next;
+      updateControlDirty();
+      renderOverview();
+      const labels = {
+        submissionsOpen: next ? ['Submissions opened', 'Students can submit again.'] : ['Submissions closed', 'Students can no longer submit.'],
+        resultsPublished: next ? ['Results published', 'Students can now see scores and rankings.'] : ['Results hidden', 'Students now see every project as Pending.'],
+      }[key];
+      toast(labels[0], labels[1], 'success');
+    } catch (err) {
+      toast('Could not update setting', err.message, 'error');
+      btn.disabled = false;
+    }
+  }
+
+  function requestCloseControl() {
+    if (!Object.keys(controlChanges()).length) return el.controlDialog.close();
+    confirmAction({
+      title: 'Discard unsaved changes?',
+      text: 'Your edits to the course settings haven’t been saved.',
+      okLabel: 'Discard',
+      iconName: 'alert',
+      onConfirm: async () => el.controlDialog.close(),
+    });
+  }
+
+  function dangerAction(kind) {
+    const actions = {
+      revoke: {
+        title: 'Sign out all faculty?',
+        text: 'Every faculty session ends immediately, including yours. Everyone will need the instructor password to sign in again.',
+        okLabel: 'Sign out everyone',
+        iconName: 'logout',
+        run: async () => {
+          const { count } = await api('/api/admin/revoke-sessions', { method: 'POST' });
+          setToken(null, { reload: true });
+          toast('All faculty signed out', `${count} session${count === 1 ? '' : 's'} ended.`, 'success');
+        },
+      },
+      reset: {
+        title: 'Clear all scores?',
+        text: 'Every project goes back to Pending. Reviewer notes are kept. This can’t be undone, so export a CSV backup first.',
+        okLabel: 'Clear scores',
+        iconName: 'alert',
+        requireText: 'RESET',
+        run: async () => {
+          const { count } = await api('/api/admin/reset-scores', { method: 'POST', body: { confirm: 'RESET' } });
+          await loadProjects({ silent: true });
+          renderOverview();
+          toast('Scores cleared', `${count} project${count === 1 ? '' : 's'} moved back to Pending.`, 'success');
+        },
+      },
+      delete: {
+        title: 'Delete all projects?',
+        text: 'Every submission and evaluation is permanently removed. This can’t be undone, so export a CSV backup first.',
+        okLabel: 'Delete everything',
+        iconName: 'trash',
+        requireText: 'DELETE',
+        run: async () => {
+          const { count } = await api('/api/admin/delete-all', { method: 'POST', body: { confirm: 'DELETE' } });
+          await loadProjects({ silent: true });
+          renderOverview();
+          toast('All projects deleted', `${count} project${count === 1 ? '' : 's'} removed.`, 'success');
+        },
+      },
+    };
+    const a = actions[kind];
+    if (a) confirmAction({ ...a, busyLabel: 'Working…', onConfirm: a.run });
   }
 
   /* ============================================================== preview */
@@ -1012,13 +1396,20 @@
   }
 
   // Generic dialog behaviour: [data-close] buttons and backdrop clicks.
+  // The Control Center asks before discarding unsaved settings.
   $$('dialog.modal').forEach((dlg) => {
+    const close = () => (dlg === el.controlDialog ? requestCloseControl() : dlg.close());
     let downOnBackdrop = false;
     dlg.addEventListener('mousedown', (e) => { downOnBackdrop = e.target === dlg; });
     dlg.addEventListener('click', (e) => {
-      if (e.target.closest('[data-close]')) return dlg.close();
-      if (e.target === dlg && downOnBackdrop) dlg.close();
+      if (e.target.closest('[data-close]')) return close();
+      if (e.target === dlg && downOnBackdrop) close();
     });
+  });
+
+  el.controlDialog.addEventListener('cancel', (e) => {
+    e.preventDefault();
+    requestCloseControl();
   });
 
   el.previewDialog.addEventListener('close', () => {
@@ -1040,7 +1431,37 @@
 
   el.submitForm.addEventListener('submit', onSubmit);
   el.loginForm.addEventListener('submit', onLogin);
-  $('#confirmOk').addEventListener('click', doDelete);
+  $('#confirmOk').addEventListener('click', runConfirm);
+  $('#confirmType').addEventListener('input', (e) => {
+    const word = state.confirmHandler?.requireText;
+    $('#confirmOk').disabled = Boolean(word) && e.target.value.trim() !== word;
+  });
+  $('#confirmType').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      runConfirm();
+    }
+  });
+
+  $('#controlBtn').addEventListener('click', () => openControl());
+  el.controlForm.addEventListener('submit', onControlSave);
+  el.controlForm.addEventListener('input', updateControlDirty);
+  el.controlForm.addEventListener('change', updateControlDirty);
+  $('#controlDiscard').addEventListener('click', fillControlForm);
+  $('#clearDeadline').addEventListener('click', () => {
+    el.controlForm.elements.deadline.value = '';
+    updateControlDirty();
+  });
+  $('#activityRefresh').addEventListener('click', loadActivity);
+  $('#controlNav').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-tab]');
+    if (btn) showControlTab(btn.dataset.tab);
+  });
+  $('#overviewGrid').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-quick]');
+    if (btn) quickToggle(btn.dataset.quick, btn);
+  });
+  $$('[data-danger]').forEach((b) => b.addEventListener('click', () => dangerAction(b.dataset.danger)));
   $('#qSave').addEventListener('click', () => saveQuickGrade(false));
   $('#qSaveNext').addEventListener('click', () => saveQuickGrade(true));
 
@@ -1113,6 +1534,12 @@
 
   // Live refresh so faculty see new submissions without reloading.
   setInterval(() => { if (!document.hidden) loadProjects({ silent: true }); }, 30000);
+  // Keep the deadline countdown and open/closed state current between refreshes.
+  setInterval(() => {
+    if (document.hidden || !state.settings.deadline) return;
+    renderChrome();
+    if (el.controlDialog.open && state.controlTab === 'overview') renderOverview();
+  }, 20000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && state.loaded) loadProjects({ silent: true }); });
 
   /* ================================================================= init */
