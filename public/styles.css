@@ -461,7 +461,25 @@ h1 { font-size: clamp(44px, 6.6vw, 84px); line-height: 0.94; letter-spacing: -0.
 
 .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 64px 0 6px; }
 .section-head h2 { margin-top: 10px; font-size: 30px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
-.section-meta { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.section-meta { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 12px; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 4px 0 11px;
+  border-radius: 999px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 12.5px;
+  font-weight: 500;
+  max-width: 100%;
+  animation: pop 0.25s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+.filter-pill > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-pill .i { width: 13px; height: 13px; flex: none; }
+.filter-pill button { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--bg) 18%, transparent); color: var(--bg); cursor: pointer; transition: background-color 0.15s; }
+.filter-pill button:hover { background: color-mix(in srgb, var(--bg) 32%, transparent); }
 .section-meta strong { color: var(--text); font-weight: 500; }
 
 /* Sticky filter bar; gains a hairline once it docks under the top bar. */
@@ -1236,7 +1254,8 @@ button.eval:hover { background: var(--surface-hover); }
   .cohort-count strong { font-size: 46px; }
   .stat { padding: 18px 18px 16px; }
   .stat-value { font-size: 32px; margin-top: 14px; }
-  .section-head { margin-top: 44px; }
+  .section-head { margin-top: 44px; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .section-meta { justify-content: flex-start; }
   .section-head h2 { font-size: 24px; }
   .toolbar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0 -16px 12px; padding: 10px 16px; }
   .toolbar > * { min-width: 0; }

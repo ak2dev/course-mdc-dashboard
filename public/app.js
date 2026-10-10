@@ -480,13 +480,19 @@
     }).join('');
   }
 
+  // When a filter is active, say so and offer a one-click way back to all teams.
   function renderSectionMeta() {
     const total = state.projects.length;
     const shown = visibleProjects().length;
-    const filtered = state.filter !== 'all' || state.query.trim();
+    const query = state.query.trim();
+    const parts = [];
+    if (query) parts.push(`“${esc(query)}”`);
+    if (state.filter !== 'all') parts.push(esc(FILTERS.find((f) => f.key === state.filter)?.chip || state.filter));
     $('#sectionMeta').innerHTML = !state.loaded ? ''
-      : filtered
-        ? `Showing <strong>${shown}</strong> of ${total} team${total === 1 ? '' : 's'}`
+      : parts.length
+        ? `<span class="filter-pill">${icon('filter')}<span>Filtered by ${parts.join(' + ')}</span>
+             <button type="button" data-clear-filters aria-label="Clear filters" title="Show all teams">${icon('x')}</button></span>
+           <span>Showing <strong>${shown}</strong> of ${total} team${total === 1 ? '' : 's'}</span>`
         : `<strong>${total}</strong> team${total === 1 ? '' : 's'} · <strong>${computeStats().students}</strong> students`;
   }
 
@@ -555,7 +561,7 @@
     const extra = members.length > 2 ? ` <em>+${members.length - 2}</em>` : '';
     return `<div class="people">
       <div class="avatar-stack">${members.slice(0, 3).map((m) =>
-        `<button type="button" class="avatar-btn" data-action="member" data-member="${esc(m)}" title="${esc(m)}">${avatar(m)}</button>`).join('')}</div>
+        `<button type="button" class="avatar-btn" data-action="member" data-member="${esc(m)}" title="${esc(m)} · show only this student’s team">${avatar(m)}</button>`).join('')}</div>
       <span class="people-names" title="${esc(members.join(', '))}">${esc(shown)}${extra}</span>
     </div>`;
   }
@@ -1574,12 +1580,18 @@
     else if (action === 'submit') openSubmit();
     else if (action === 'clear-filters') clearFilters();
     else if (action === 'member') {
-      el.search.value = target.dataset.member;
-      state.query = target.dataset.member;
+      // Clicking the same student again turns the filter off.
+      const member = target.dataset.member;
+      if (state.query.trim().toLowerCase() === member.toLowerCase()) return clearFilters();
+      el.search.value = member;
+      state.query = member;
       state.filter = 'all';
       render();
-      window.scrollTo({ top: el.search.getBoundingClientRect().top + window.scrollY - 120, behavior: 'smooth' });
     }
+  });
+
+  $('#sectionMeta').addEventListener('click', (e) => {
+    if (e.target.closest('[data-clear-filters]')) clearFilters();
   });
 
   document.addEventListener('keydown', (e) => {
