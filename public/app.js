@@ -188,7 +188,9 @@
     }
   }
 
-  const typeTag = (p) => `<span class="type-tag ${isApp(p) ? 'app' : ''}">${isApp(p) ? 'App' : 'Web'}</span>`;
+  const typeTag = (p) => isApp(p)
+    ? `<span class="type-tag app" title="Application program · demo video">${icon('video')}App</span>`
+    : `<span class="type-tag" title="Web project · live deployment">${icon('globe')}Web</span>`;
 
   const find = (id) => state.projects.find((p) => p.id === id);
   const isTeacher = () => Boolean(state.token);

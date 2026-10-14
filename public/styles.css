@@ -1273,23 +1273,39 @@ button.eval:hover { background: var(--surface-hover); }
 .drive-hint .i { width: 14px; height: 14px; margin-top: 2px; }
 .drive-hint strong { color: var(--text); font-weight: 500; }
 
+/* Type pill: icon + label with a soft top sheen and hairline ring. */
 .type-tag {
   display: inline-flex;
   align-items: center;
-  height: 18px;
-  padding: 0 6px;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px 0 6px;
   margin-left: 8px;
-  border-radius: 5px;
-  border: 1px solid var(--border-strong);
-  font-family: 'Geist Mono', monospace;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-2);
+  border-radius: 999px;
+  font-family: 'Geist', sans-serif;
+  font-size: 11px;
+  font-weight: 550;
+  letter-spacing: 0.005em;
+  line-height: 1;
+  white-space: nowrap;
   vertical-align: 2px;
+  color: var(--text-2);
+  background: linear-gradient(180deg, var(--surface-solid), color-mix(in srgb, var(--text) 4%, var(--surface-solid)));
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    inset 0 1px 0 color-mix(in srgb, var(--surface-solid) 80%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.05);
 }
-.type-tag.app { background: var(--text); border-color: var(--text); color: var(--bg); }
+.type-tag .i { width: 11px; height: 11px; stroke-width: 2; color: var(--text-3); }
+.type-tag.app {
+  color: var(--bg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--text) 82%, var(--bg)), var(--text));
+  box-shadow:
+    inset 0 0 0 1px var(--text),
+    inset 0 1px 0 color-mix(in srgb, var(--bg) 22%, transparent),
+    0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.type-tag.app .i { color: color-mix(in srgb, var(--bg) 75%, var(--text)); }
 .link-pill.demo .i { width: 11px; height: 11px; }
 
 /* Application demos: video fills the stage; device sizes don't apply. */
