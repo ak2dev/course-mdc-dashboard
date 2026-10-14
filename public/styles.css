@@ -671,8 +671,11 @@ button.eval:hover { background: var(--surface-hover); }
 .team-cell { min-width: 160px; }
 .team-cell strong { display: block; font-weight: 600; font-size: 14.5px; letter-spacing: -0.015em; white-space: nowrap; }
 .team-cell time, .meta { display: block; margin-top: 2px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
-.project-cell { max-width: 220px; }
-.project-cell strong { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-cell { max-width: 250px; }
+/* The title truncates; the type tag sits beside it and never gets clipped. */
+.project-cell .title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.project-cell strong { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.project-cell .title-row .type-tag { flex: none; margin-left: 0; }
 .project-cell .stack { display: block; margin-top: 2px; font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .members-cell { min-width: 210px; }
 

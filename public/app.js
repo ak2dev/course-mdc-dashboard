@@ -628,7 +628,7 @@
               <td><span class="seq">${seqLabel(seq.get(p.id))}</span></td>
               <td class="team-cell"><strong>${esc(p.teamName)}</strong><time datetime="${esc(p.createdAt)}" title="${esc(absTime(p.createdAt))}">Submitted ${relTime(p.createdAt)}</time></td>
               <td class="members-cell">${people(p.members)}</td>
-              <td class="project-cell"><strong>${esc(p.title)}${typeTag(p)}</strong>${p.techStack ? `<span class="stack" title="${esc(p.techStack)}">${esc(p.techStack)}</span>` : ''}</td>
+              <td class="project-cell"><div class="title-row"><strong title="${esc(p.title)}">${esc(p.title)}</strong>${typeTag(p)}</div>${p.techStack ? `<span class="stack" title="${esc(p.techStack)}">${esc(p.techStack)}</span>` : ''}</td>
               <td>${deployLink(p)}</td>
               <td>${repoLink(p)}</td>
               <td>${evalCell(p)}</td>
