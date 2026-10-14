@@ -79,6 +79,19 @@ async function coreSuite() {
   const dupTeam = await call('POST', '/api/projects', { body: { teamName: `test core ${stamp}`, title: 'X', members: [`New ${stamp}`] } });
   check('duplicate team -> 409', dupTeam.status === 409, dupTeam.data.error);
 
+  check('web submission defaults to type "web"', created.data.project?.type === 'web');
+  const app = await call('POST', '/api/projects', {
+    body: { ...team('App', ['Gamma']), type: 'app', demoUrl: 'drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr/view', vercelUrl: 'ignored.vercel.app' },
+  });
+  const appId = app.data.project?.id;
+  check('application program: Drive demo stored, deployment link dropped',
+    app.status === 201 && app.data.project.type === 'app' &&
+    app.data.project.demoUrl === 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr/view' && app.data.project.vercelUrl === '',
+    String(app.status));
+  const notDrive = await call('POST', '/api/projects', { body: { ...team('App2', ['Delta']), type: 'app', demoUrl: 'youtube.com/watch?v=x' } });
+  check('non-Drive demo link -> 400', notDrive.status === 400, notDrive.data.error);
+  check('unknown project type -> 400', (await call('POST', '/api/projects', { body: { ...team('App3', ['Eps']), type: 'mobile' } })).status === 400);
+
   const graded = await call('PATCH', `/api/projects/${id}`, { token, body: { score: 8.46, reviewerNotes: 'smoke' } });
   check('grade rounds to 8.5', graded.status === 200 && graded.data.project.score === 8.5 && graded.data.project.status === 'graded');
   check('score 11 -> 400', (await call('PATCH', `/api/projects/${id}`, { token, body: { score: 11 } })).status === 400);
@@ -91,6 +104,9 @@ async function coreSuite() {
   check('CSV unauth -> 401', (await call('GET', '/api/export/csv')).status === 401);
   const csv = await call('GET', '/api/export/csv', { token });
   check('CSV export', csv.status === 200 && String(csv.data).includes(`Test Core ${stamp}`));
+  check('CSV includes project type + demo video columns',
+    /Project Type/.test(String(csv.data)) && String(csv.data).includes('Application program') && String(csv.data).includes('drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr'));
+  check('delete application program', (await call('DELETE', `/api/projects/${appId}`, { token })).status === 200);
 
   const fc = await call('GET', `/api/frame-check?url=${encodeURIComponent('https://github.com')}`);
   check('frame-check detects blocked embedding', fc.status === 200 && fc.data.embeddable === false);

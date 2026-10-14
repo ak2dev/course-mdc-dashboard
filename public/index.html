@@ -45,10 +45,23 @@
           <svg class="i"><use href="#i-lock" /></svg>
           <span class="label">Faculty</span>
         </button>
-        <button class="btn btn-primary" id="submitBtn" type="button">
-          <svg class="i"><use href="#i-plus" /></svg>
-          <span class="hide-sm">Submit project</span>
-        </button>
+        <div class="submit-wrap">
+          <button class="btn btn-primary" id="submitBtn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="submitMenu">
+            <svg class="i"><use href="#i-plus" /></svg>
+            <span class="hide-sm">Submit project</span>
+          </button>
+          <div class="submit-menu" id="submitMenu" role="menu" aria-label="Choose submission type" hidden>
+            <span class="submit-menu-label">What are you submitting?</span>
+            <button type="button" role="menuitem" data-submit-type="web">
+              <span class="sm-icon"><svg class="i"><use href="#i-deploy" /></svg></span>
+              <span class="sm-text"><strong>Web project</strong><small>Share a live deployment link, e.g. Vercel</small></span>
+            </button>
+            <button type="button" role="menuitem" data-submit-type="app">
+              <span class="sm-icon"><svg class="i"><use href="#i-video" /></svg></span>
+              <span class="sm-text"><strong>Application program</strong><small>Share a demo video on Google Drive</small></span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -131,6 +144,25 @@
       </header>
 
       <div class="modal-body form-grid">
+        <div class="field span-2">
+          <span class="field-label" id="typeLabel">Submission type</span>
+          <div class="type-switch" role="radiogroup" aria-labelledby="typeLabel">
+            <label class="type-option">
+              <input type="radio" name="type" value="web" checked />
+              <span class="type-card">
+                <span class="type-icon"><svg class="i"><use href="#i-deploy" /></svg></span>
+                <span><strong>Web project</strong><small>Live deployment link</small></span>
+              </span>
+            </label>
+            <label class="type-option">
+              <input type="radio" name="type" value="app" />
+              <span class="type-card">
+                <span class="type-icon"><svg class="i"><use href="#i-video" /></svg></span>
+                <span><strong>Application program</strong><small>Demo video on Google Drive</small></span>
+              </span>
+            </label>
+          </div>
+        </div>
         <div class="field">
           <label for="fTeam">Team name <em>*</em></label>
           <input id="fTeam" name="teamName" maxlength="60" placeholder="e.g. Pixel Pioneers" required />
@@ -157,11 +189,18 @@
           <input id="fStack" name="techStack" maxlength="300" placeholder="e.g. Next.js, Tailwind, Supabase" />
         </div>
 
-        <div class="field">
+        <div class="field" id="fieldVercel">
           <label for="fVercel">Live deployment URL</label>
           <div class="input-icon">
             <svg class="i"><use href="#i-deploy" /></svg>
             <input id="fVercel" name="vercelUrl" inputmode="url" placeholder="your-app.vercel.app" data-url />
+          </div>
+        </div>
+        <div class="field" id="fieldDemo" hidden>
+          <label for="fDemo">Demo video (Google Drive)</label>
+          <div class="input-icon">
+            <svg class="i"><use href="#i-video" /></svg>
+            <input id="fDemo" name="demoUrl" inputmode="url" placeholder="drive.google.com/file/d/…" data-url />
           </div>
         </div>
         <div class="field">
@@ -171,6 +210,10 @@
             <input id="fGithub" name="githubUrl" inputmode="url" placeholder="github.com/team/repo" data-url />
           </div>
         </div>
+        <p class="hint span-2 drive-hint" id="driveHint" hidden>
+          <svg class="i"><use href="#i-info" /></svg>
+          In Google Drive, set the video's sharing to <strong>Anyone with the link</strong> so faculty can watch it here.
+        </p>
 
         <fieldset class="teacher-only grade-fieldset span-2">
           <legend><svg class="i"><use href="#i-shield" /></svg> Faculty evaluation</legend>
@@ -272,10 +315,10 @@
             <div class="device-screen">
               <iframe id="previewFrame" title="Deployment preview" referrerpolicy="no-referrer"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
-              <div class="frame-loading" id="frameLoading"><span class="spinner lg"></span><span>Loading deployment…</span></div>
+              <div class="frame-loading" id="frameLoading"><span class="spinner lg"></span><span id="frameLoadingText">Loading deployment…</span></div>
               <div class="frame-blocked" id="frameBlocked" hidden>
                 <span class="blocked-icon"><svg class="i"><use href="#i-alert" /></svg></span>
-                <h3>This site can't be embedded</h3>
+                <h3 id="frameBlockedTitle">This site can't be embedded</h3>
                 <p id="frameBlockedReason">The deployment blocks iframes via X-Frame-Options or CSP.</p>
                 <a class="btn btn-primary" id="frameBlockedOpen" href="#" target="_blank" rel="noopener noreferrer">
                   <svg class="i"><use href="#i-external" /></svg> Open in new tab
@@ -552,6 +595,9 @@
       <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></symbol>
       <symbol id="i-inbox" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
       <symbol id="i-filter" viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4 2v-8z"/></symbol>
+      <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="5" width="14" height="14" rx="2.5"/><path d="m16 10.5 6-3.5v10l-6-3.5"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12.5-7.5z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
       <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
       <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
       <symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></symbol>

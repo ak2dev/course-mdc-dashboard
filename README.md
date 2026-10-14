@@ -55,6 +55,17 @@ Open http://localhost:3000. Without a `.env.local` file, data is stored in `data
 
 These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherwise. When using the JSON file, stop the server before running them.
 
+## Submission types
+
+**Submit project** opens a menu with two options. Both take a team name, project title, team members, tech stack and notes, and a GitHub link.
+
+| Type | Showcase link | Stored as |
+| --- | --- | --- |
+| Web project | Live deployment URL, e.g. Vercel | `type: "web"`, `vercelUrl` |
+| Application program | Demo video on Google Drive (`drive.google.com` links only) | `type: "app"`, `demoUrl` |
+
+Faculty can watch an application's demo inside the preview window while grading. This only works for links to a single file (`drive.google.com/file/d/…`) shared as "Anyone with the link"; folder links open in Google Drive instead. Projects submitted before types existed count as web projects. The CSV export includes "Project Type" and "Demo Video URL" columns.
+
 ## Control Center (faculty)
 
 After signing in, faculty get a **Control** button in the top bar. Every setting is enforced by the API, not just hidden in the page.
@@ -77,7 +88,7 @@ npm test                                          # against http://localhost:300
 BASE_URL=https://your-app.vercel.app npm test     # against a deployment
 ```
 
-This runs 47 end-to-end API checks covering the core API and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`). Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
+This runs 51 end-to-end API checks covering the core API, both submission types and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`). Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
 
 ## How it works on serverless
 

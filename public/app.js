@@ -169,6 +169,27 @@
     }
   }
 
+  // Web projects showcase a live deployment; application programs a Drive demo video.
+  const isApp = (p) => p?.type === 'app';
+  const linkOf = (p) => (isApp(p) ? p.demoUrl : p.vercelUrl) || '';
+  const isDriveUrl = (value) => {
+    try { return /^(drive|docs)\.google\.com$/i.test(new URL(value).hostname); } catch { return false; }
+  };
+
+  // File ID from /file/d/<id>/… or ?id=<id> links; folders and other links return null.
+  function driveFileId(value) {
+    try {
+      const u = new URL(value);
+      if (!isDriveUrl(value)) return null;
+      const id = u.pathname.match(/\/file\/d\/([\w-]{10,})/)?.[1] || u.searchParams.get('id');
+      return id && /^[\w-]{10,}$/.test(id) ? id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const typeTag = (p) => `<span class="type-tag ${isApp(p) ? 'app' : ''}">${isApp(p) ? 'App' : 'Web'}</span>`;
+
   const find = (id) => state.projects.find((p) => p.id === id);
   const isTeacher = () => Boolean(state.token);
 
@@ -328,7 +349,8 @@
     btn.setAttribute('aria-disabled', String(locked));
     btn.innerHTML = locked
       ? `${icon('lock')}<span class="hide-sm">Submissions closed</span>`
-      : `${icon('plus')}<span class="hide-sm">Submit project</span>`;
+      : `${icon('plus')}<span class="hide-sm">Submit project</span>${icon('chevron', 'chev')}`;
+    if (locked) closeSubmitMenu();
   }
 
   /* =============================================================== derive */
@@ -493,7 +515,7 @@
         ? `<span class="filter-pill">${icon('filter')}<span>Filtered by ${parts.join(' + ')}</span>
              <button type="button" data-clear-filters aria-label="Clear filters" title="Show all teams">${icon('x')}</button></span>
            <span>Showing <strong>${shown}</strong> of ${total} team${total === 1 ? '' : 's'}</span>`
-        : `<strong>${total}</strong> team${total === 1 ? '' : 's'} · <strong>${computeStats().students}</strong> students`;
+        : `<span><strong>${total}</strong> team${total === 1 ? '' : 's'} · <strong>${computeStats().students}</strong> students</span>`;
   }
 
   function renderView() {
@@ -542,6 +564,13 @@
   }
 
   function deployLink(p) {
+    if (isApp(p)) {
+      if (!p.demoUrl) return '<span class="not-provided">No demo video</span>';
+      return `<div class="link-group">
+        <a class="link-pill demo" href="${esc(p.demoUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.demoUrl)}">${icon('play')}<span>Demo video</span></a>
+        <button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="Watch demo here" aria-label="Watch ${esc(p.teamName)} demo">${icon('eye')}</button>
+      </div>`;
+    }
     if (!p.vercelUrl) return '<span class="not-provided">Not submitted</span>';
     return `<div class="link-group">
       <a class="link-pill deploy" href="${esc(p.vercelUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.vercelUrl)}">${icon('deploy')}<span>${esc(prettyUrl(p.vercelUrl))}</span></a>
@@ -589,7 +618,7 @@
         <table class="data-table">
           <thead><tr>
             <th class="col-seq">#</th><th>Team</th><th>Members</th><th>Project</th>
-            <th>Deployment</th><th>Repository</th><th>Evaluation</th>
+            <th>Live site / Demo</th><th>Repository</th><th>Evaluation</th>
             <th class="col-actions teacher-only">Actions</th>
           </tr></thead>
           <tbody>${list.map((p, i) => `
@@ -597,7 +626,7 @@
               <td><span class="seq">${seqLabel(seq.get(p.id))}</span></td>
               <td class="team-cell"><strong>${esc(p.teamName)}</strong><time datetime="${esc(p.createdAt)}" title="${esc(absTime(p.createdAt))}">Submitted ${relTime(p.createdAt)}</time></td>
               <td class="members-cell">${people(p.members)}</td>
-              <td class="project-cell"><strong>${esc(p.title)}</strong>${p.techStack ? `<span class="stack" title="${esc(p.techStack)}">${esc(p.techStack)}</span>` : ''}</td>
+              <td class="project-cell"><strong>${esc(p.title)}${typeTag(p)}</strong>${p.techStack ? `<span class="stack" title="${esc(p.techStack)}">${esc(p.techStack)}</span>` : ''}</td>
               <td>${deployLink(p)}</td>
               <td>${repoLink(p)}</td>
               <td>${evalCell(p)}</td>
@@ -619,7 +648,7 @@
             <div>
               <span class="seq">#${seqLabel(seq.get(p.id))}</span>
               <h3>${esc(p.teamName)}</h3>
-              <p class="p-title">${esc(p.title)}</p>
+              <p class="p-title">${esc(p.title)}${typeTag(p)}</p>
             </div>
             ${ring(p.score, 56, 4)}
           </div>
@@ -630,8 +659,8 @@
             ${memberChips(p.members)}
           </div>
           <div class="p-card-foot">
-            <button type="button" class="btn btn-secondary btn-sm" data-action="preview" data-id="${p.id}" ${p.vercelUrl ? '' : 'disabled'}>${icon('eye')} Preview</button>
-            ${p.vercelUrl ? `<a class="icon-btn sm" href="${esc(p.vercelUrl)}" target="_blank" rel="noopener noreferrer" title="Open live site">${icon('external')}</a>` : ''}
+            <button type="button" class="btn btn-secondary btn-sm" data-action="preview" data-id="${p.id}" ${linkOf(p) ? '' : 'disabled'}>${icon(isApp(p) ? 'play' : 'eye')} ${isApp(p) ? 'Watch demo' : 'Preview'}</button>
+            ${linkOf(p) ? `<a class="icon-btn sm" href="${esc(linkOf(p))}" target="_blank" rel="noopener noreferrer" title="${isApp(p) ? 'Open demo video in Google Drive' : 'Open live site'}">${icon('external')}</a>` : ''}
             ${p.githubUrl ? `<a class="icon-btn sm" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="Open repository">${icon('github')}</a>` : ''}
             <span class="spacer"></span>
             <span class="teacher-only">${teacherActions(p)}</span>
@@ -691,7 +720,7 @@
         <div class="rank-project">${badge(p.score)}</div>
         <div class="score-bar tier-${t.key}"><span class="bar"><i style="width:${p.score * 10}%"></i></span><span class="score">${fmtScore(p.score)}</span></div>
         <div class="rank-links">
-          ${p.vercelUrl ? `<button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="Preview">${icon('eye')}</button>` : ''}
+          ${linkOf(p) ? `<button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="${isApp(p) ? 'Watch demo' : 'Preview'}">${icon(isApp(p) ? 'play' : 'eye')}</button>` : ''}
           ${p.githubUrl ? `<a class="icon-btn sm" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="Repository">${icon('github')}</a>` : ''}
         </div>
       </div>`;
@@ -839,7 +868,24 @@
     if (tags.length) $('#memberTags').closest('.field').classList.remove('invalid');
   });
 
-  function openSubmit(project = null) {
+  const formType = () => el.submitForm.elements.type.value || 'web';
+
+  // Shows the link field that matches the chosen submission type.
+  function applyFormType(type, { isNew = !state.editingId } = {}) {
+    el.submitForm.elements.type.value = type;
+    const app = type === 'app';
+    $('#fieldVercel').hidden = app;
+    $('#fieldDemo').hidden = !app;
+    $('#driveHint').hidden = !app;
+    if (isNew) {
+      $('#submitTitle').textContent = app ? 'Submit an application program' : 'Submit a web project';
+      $('#submitKicker').textContent = app ? 'New submission · Application program' : 'New submission · Web project';
+    }
+    $$('#fieldVercel, #fieldDemo').forEach((n) => n.classList.remove('invalid'));
+  }
+
+  function openSubmit(project = null, type = 'web') {
+    closeSubmitMenu();
     if (!project && !isTeacher() && !isAccepting()) {
       const status = submissionStatus();
       toast('Submissions are closed', status.detail ? `The ${status.detail}.` : 'Faculty have closed new submissions.', 'error');
@@ -860,10 +906,12 @@
     $('#fTitle').value = project?.title || '';
     f.techStack.value = project?.techStack || '';
     f.vercelUrl.value = project?.vercelUrl || '';
+    f.demoUrl.value = project?.demoUrl || '';
     f.githubUrl.value = project?.githubUrl || '';
     f.reviewerNotes.value = project?.reviewerNotes || '';
     members.set(project?.members || []);
     formScore.set(project?.score ?? null);
+    applyFormType(project ? (isApp(project) ? 'app' : 'web') : type, { isNew: !project });
     el.submitDialog.showModal();
     setTimeout(() => f.teamName.focus(), 30);
   }
@@ -875,14 +923,18 @@
     members.commit();
 
     f.vercelUrl.value = withScheme(f.vercelUrl.value);
+    f.demoUrl.value = withScheme(f.demoUrl.value);
     f.githubUrl.value = withScheme(f.githubUrl.value);
 
+    const type = formType();
     const payload = {
+      type,
       teamName: f.teamName.value.trim(),
       title: $('#fTitle').value.trim(),
       members: members.get(),
       techStack: f.techStack.value.trim(),
-      vercelUrl: f.vercelUrl.value,
+      vercelUrl: type === 'web' ? f.vercelUrl.value : '',
+      demoUrl: type === 'app' ? f.demoUrl.value : '',
       githubUrl: f.githubUrl.value,
     };
 
@@ -893,6 +945,9 @@
     if (!payload.title) flag($('#fTitle'), 'Project title is required.');
     if (!payload.members.length) flag($('#fMemberInput'), 'Add at least one team member.');
     if (payload.vercelUrl && !validUrl(payload.vercelUrl)) flag(f.vercelUrl, 'Deployment URL is not valid.');
+    if (payload.demoUrl && !(validUrl(payload.demoUrl) && isDriveUrl(payload.demoUrl))) {
+      flag(f.demoUrl, 'Demo video must be a Google Drive link (drive.google.com).');
+    }
     if (payload.githubUrl && !validUrl(payload.githubUrl, { github: true })) flag(f.githubUrl, 'Repository link must be a github.com URL.');
 
     if (isTeacher()) {
@@ -1337,10 +1392,11 @@
     if (!p) return;
     $('#previewSeq').textContent = `#${seqLabel(sequence().get(p.id))}`;
     $('#previewTeam').textContent = p.teamName;
-    $('#previewProject').textContent = p.title;
-    $('#previewOpen').href = p.vercelUrl;
-    $('#frameBlockedOpen').href = p.vercelUrl;
-    $('#deviceUrl').textContent = prettyUrl(p.vercelUrl);
+    $('#previewProject').textContent = `${p.title} · ${isApp(p) ? 'Application program' : 'Web project'}`;
+    $('#previewOpen').href = linkOf(p);
+    $('#previewOpen').querySelector('span').textContent = isApp(p) ? 'Open in Drive' : 'Open site';
+    $('#frameBlockedOpen').href = linkOf(p);
+    $('#deviceUrl').textContent = prettyUrl(linkOf(p));
 
     const t = tierOf(p.score);
     $('#previewEval').innerHTML = `${ring(p.score, 60, 5)}<div class="sp-text">${badge(p.score)}<small>${
@@ -1351,7 +1407,8 @@
     const rows = [
       ['Submitted', esc(absTime(p.createdAt))],
       ['Tech stack', esc(p.techStack || '—')],
-      ['Live site', `<a href="${esc(p.vercelUrl)}" target="_blank" rel="noopener noreferrer">${esc(prettyUrl(p.vercelUrl))}</a>`],
+      [isApp(p) ? 'Demo video' : 'Live site',
+        `<a href="${esc(linkOf(p))}" target="_blank" rel="noopener noreferrer">${isApp(p) ? 'Open in Google Drive' : esc(prettyUrl(linkOf(p)))}</a>`],
       ['Repository', p.githubUrl ? `<a href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer">${esc(repoPath(p.githubUrl))}</a>` : '—'],
     ];
     if (p.gradedAt && isTeacher()) rows.push(['Last graded', esc(absTime(p.gradedAt))]);
@@ -1362,24 +1419,44 @@
     $('#qSaveNext').disabled = !nextPending(p.id);
   }
 
-  async function loadFrame(url) {
+  function showFrameBlocked(title, reason) {
+    $('#frameBlockedTitle').textContent = title;
+    $('#frameBlockedReason').textContent = reason;
+    el.frameBlocked.hidden = false;
+    el.frameLoading.classList.add('done');
+  }
+
+  async function loadFrame(p) {
+    const app = isApp(p);
     const token = ++frameToken;
     el.frameLoading.classList.remove('done');
+    $('#frameLoadingText').textContent = app ? 'Loading demo video…' : 'Loading deployment…';
     el.frameBlocked.hidden = true;
     el.frame.src = 'about:blank';
-    requestAnimationFrame(() => { if (token === frameToken) el.frame.src = url; });
+
+    // Drive's /preview player is embeddable; folder links and other Drive URLs are not.
+    let url = linkOf(p);
+    if (app) {
+      const id = driveFileId(url);
+      if (!id) {
+        showFrameBlocked('This Drive link can’t be played here',
+          'Only links to a single video file (drive.google.com/file/d/…) can be embedded. Open it in Google Drive instead.');
+        return;
+      }
+      url = `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`;
+    }
+    setTimeout(() => { if (token === frameToken) el.frame.src = url; }, 0);
 
     const done = () => { if (token === frameToken) el.frameLoading.classList.add('done'); };
     el.frame.onload = () => { if (el.frame.src !== 'about:blank') done(); };
     setTimeout(done, 12000);
+    if (app) return;
 
     try {
       const check = await api(`/api/frame-check?url=${encodeURIComponent(url)}`);
       if (token !== frameToken) return;
       if (!check.embeddable) {
-        $('#frameBlockedReason').textContent = `${check.reason} Open the deployment directly to review it.`;
-        el.frameBlocked.hidden = false;
-        done();
+        showFrameBlocked('This site can’t be embedded', `${check.reason} Open the deployment directly to review it.`);
       } else if (check.error === 'unreachable') {
         toast('Deployment may be offline', 'The server could not reach this URL. The preview may not load.', 'info');
       }
@@ -1389,15 +1466,17 @@
   function openPreview(id) {
     const p = find(id);
     if (!p) return;
-    if (!p.vercelUrl) {
-      toast('No live deployment', `${p.teamName} hasn't submitted a deployment URL yet.`, 'info');
+    if (!linkOf(p)) {
+      toast(isApp(p) ? 'No demo video' : 'No live deployment',
+        `${p.teamName} hasn't submitted ${isApp(p) ? 'a demo video link' : 'a deployment URL'} yet.`, 'info');
       if (isTeacher()) openSubmit(p);
       return;
     }
     state.previewId = id;
+    el.previewDialog.classList.toggle('is-app', isApp(p));
     fillPreview(p);
     setDevice(state.device);
-    loadFrame(p.vercelUrl);
+    loadFrame(p);
     if (!el.previewDialog.open) el.previewDialog.showModal();
   }
 
@@ -1406,7 +1485,7 @@
     const start = list.findIndex((p) => p.id === currentId);
     for (let i = 1; i < list.length; i++) {
       const p = list[(start + i) % list.length];
-      if (p.score === null && p.vercelUrl && p.id !== currentId) return p;
+      if (p.score === null && linkOf(p) && p.id !== currentId) return p;
     }
     return null;
   }
@@ -1492,7 +1571,47 @@
   el.facultyBtn.addEventListener('click', () => (isTeacher() ? logout() : openLogin()));
   $('#footerFaculty').addEventListener('click', () => (isTeacher() ? logout() : openLogin()));
   $('#previewLogin').addEventListener('click', () => openLogin());
-  $('#submitBtn').addEventListener('click', () => openSubmit());
+  // Submit button opens a small menu: web project or application program.
+  function openSubmitMenu() {
+    if (!isTeacher() && !isAccepting()) return openSubmit(); // shows the "closed" message
+    $('#submitMenu').hidden = false;
+    $('#submitBtn').setAttribute('aria-expanded', 'true');
+    $('#submitMenu [role=menuitem]').focus();
+  }
+
+  function closeSubmitMenu() {
+    const menu = $('#submitMenu');
+    if (!menu || menu.hidden) return;
+    menu.hidden = true;
+    $('#submitBtn').setAttribute('aria-expanded', 'false');
+  }
+
+  $('#submitBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if ($('#submitMenu').hidden) openSubmitMenu();
+    else closeSubmitMenu();
+  });
+  $('#submitMenu').addEventListener('click', (e) => {
+    const item = e.target.closest('[data-submit-type]');
+    if (item) openSubmit(null, item.dataset.submitType);
+  });
+  $('#submitMenu').addEventListener('keydown', (e) => {
+    const items = $$('#submitMenu [role=menuitem]');
+    const i = items.indexOf(document.activeElement);
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      items[(i + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+    } else if (e.key === 'Escape') {
+      closeSubmitMenu();
+      $('#submitBtn').focus();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.submit-wrap')) closeSubmitMenu();
+  });
+  el.submitForm.addEventListener('change', (e) => {
+    if (e.target.name === 'type') applyFormType(e.target.value);
+  });
   $$('[data-open="rubric"]').forEach((b) => b.addEventListener('click', () => el.rubricDialog.showModal()));
   $$('[data-export]').forEach((b) => b.addEventListener('click', exportCsv));
 
