@@ -169,7 +169,7 @@
     }
   }
 
-  // Web projects showcase a live deployment; application programs a Drive demo video.
+  // Web projects showcase a live deployment; desktop / mobile apps a Drive demo video.
   const isApp = (p) => p?.type === 'app';
   const linkOf = (p) => (isApp(p) ? p.demoUrl : p.vercelUrl) || '';
   const isDriveUrl = (value) => {
@@ -189,7 +189,7 @@
   }
 
   const typeTag = (p) => isApp(p)
-    ? `<span class="type-tag app" title="Application program · demo video">${icon('video')}App</span>`
+    ? `<span class="type-tag app" title="Desktop / mobile app · demo video">${icon('video')}App</span>`
     : `<span class="type-tag" title="Web project · live deployment">${icon('globe')}Web</span>`;
 
   const find = (id) => state.projects.find((p) => p.id === id);
@@ -880,8 +880,8 @@
     $('#fieldDemo').hidden = !app;
     $('#driveHint').hidden = !app;
     if (isNew) {
-      $('#submitTitle').textContent = app ? 'Submit an application program' : 'Submit a web project';
-      $('#submitKicker').textContent = app ? 'New submission · Application program' : 'New submission · Web project';
+      $('#submitTitle').textContent = app ? 'Submit a desktop / mobile app' : 'Submit a web project';
+      $('#submitKicker').textContent = app ? 'New submission · Desktop / mobile app' : 'New submission · Web project';
     }
     $$('#fieldVercel, #fieldDemo').forEach((n) => n.classList.remove('invalid'));
   }
@@ -1394,7 +1394,7 @@
     if (!p) return;
     $('#previewSeq').textContent = `#${seqLabel(sequence().get(p.id))}`;
     $('#previewTeam').textContent = p.teamName;
-    $('#previewProject').textContent = `${p.title} · ${isApp(p) ? 'Application program' : 'Web project'}`;
+    $('#previewProject').textContent = `${p.title} · ${isApp(p) ? 'Desktop / mobile app' : 'Web project'}`;
     $('#previewOpen').href = linkOf(p);
     $('#previewOpen').querySelector('span').textContent = isApp(p) ? 'Open in Drive' : 'Open site';
     $('#frameBlockedOpen').href = linkOf(p);
@@ -1573,7 +1573,7 @@
   el.facultyBtn.addEventListener('click', () => (isTeacher() ? logout() : openLogin()));
   $('#footerFaculty').addEventListener('click', () => (isTeacher() ? logout() : openLogin()));
   $('#previewLogin').addEventListener('click', () => openLogin());
-  // Submit button opens a small menu: web project or application program.
+  // Submit button opens a small menu: web project or desktop / mobile app.
   function openSubmitMenu() {
     if (!isTeacher() && !isAccepting()) return openSubmit(); // shows the "closed" message
     $('#submitMenu').hidden = false;

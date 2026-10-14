@@ -84,7 +84,7 @@ async function coreSuite() {
     body: { ...team('App', ['Gamma']), type: 'app', demoUrl: 'drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr/view', vercelUrl: 'ignored.vercel.app' },
   });
   const appId = app.data.project?.id;
-  check('application program: Drive demo stored, deployment link dropped',
+  check('desktop/mobile app: Drive demo stored, deployment link dropped',
     app.status === 201 && app.data.project.type === 'app' &&
     app.data.project.demoUrl === 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr/view' && app.data.project.vercelUrl === '',
     String(app.status));
@@ -105,8 +105,8 @@ async function coreSuite() {
   const csv = await call('GET', '/api/export/csv', { token });
   check('CSV export', csv.status === 200 && String(csv.data).includes(`Test Core ${stamp}`));
   check('CSV includes project type + demo video columns',
-    /Project Type/.test(String(csv.data)) && String(csv.data).includes('Application program') && String(csv.data).includes('drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr'));
-  check('delete application program', (await call('DELETE', `/api/projects/${appId}`, { token })).status === 200);
+    /Project Type/.test(String(csv.data)) && String(csv.data).includes('Desktop / mobile app') && String(csv.data).includes('drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr'));
+  check('delete desktop/mobile app', (await call('DELETE', `/api/projects/${appId}`, { token })).status === 200);
 
   const fc = await call('GET', `/api/frame-check?url=${encodeURIComponent('https://github.com')}`);
   check('frame-check detects blocked embedding', fc.status === 200 && fc.data.embeddable === false);
