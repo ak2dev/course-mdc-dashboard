@@ -1753,6 +1753,7 @@
 
   /* ================================================================= init */
 
+  $('#copyrightYear').textContent = new Date().getFullYear();
   renderRubric();
   setDevice(state.device);
   setToken(null, { reload: false });
