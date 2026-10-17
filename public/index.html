@@ -415,6 +415,7 @@
           <button type="button" role="tab" data-tab="results"><svg class="i"><use href="#i-eye" /></svg><span>Results</span></button>
           <button type="button" role="tab" data-tab="course"><svg class="i"><use href="#i-megaphone" /></svg><span>Course</span></button>
           <button type="button" role="tab" data-tab="activity"><svg class="i"><use href="#i-activity" /></svg><span>Activity</span></button>
+          <button type="button" role="tab" data-tab="security"><svg class="i"><use href="#i-shield" /></svg><span>Security</span></button>
           <button type="button" role="tab" data-tab="danger" class="nav-danger"><svg class="i"><use href="#i-alert" /></svg><span>Danger zone</span></button>
         </nav>
 
@@ -508,6 +509,45 @@
               <button type="button" class="btn btn-secondary btn-sm" id="activityRefresh"><svg class="i"><use href="#i-refresh" /></svg> Refresh</button>
             </div>
             <ol class="activity" id="activityList"></ol>
+          </section>
+
+          <section class="panel" data-panel="security" role="tabpanel" hidden>
+            <div class="panel-head">
+              <h3>Security</h3>
+              <p>Change the faculty password shared by instructors. Every other faculty session is signed out when it changes.</p>
+            </div>
+            <div class="callout" id="securityStatus"></div>
+            <div class="pw-form">
+              <div class="field">
+                <label for="pwCurrent">Current password</label>
+                <div class="input-icon has-action">
+                  <svg class="i"><use href="#i-lock" /></svg>
+                  <input id="pwCurrent" type="password" autocomplete="current-password" spellcheck="false" />
+                  <button type="button" class="input-action" data-toggle-pw="pwCurrent" aria-label="Show password"><svg class="i"><use href="#i-eye" /></svg></button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="pwNew">New password</label>
+                <div class="input-icon has-action">
+                  <svg class="i"><use href="#i-shield" /></svg>
+                  <input id="pwNew" type="password" autocomplete="new-password" spellcheck="false" maxlength="128" />
+                  <button type="button" class="input-action" data-toggle-pw="pwNew" aria-label="Show password"><svg class="i"><use href="#i-eye" /></svg></button>
+                </div>
+                <div class="pw-meter" aria-hidden="true"><span id="pwMeterBar"></span></div>
+                <p class="hint" id="pwHint">At least 10 characters, with letters and a number or symbol.</p>
+              </div>
+              <div class="field">
+                <label for="pwConfirm">Confirm new password</label>
+                <div class="input-icon has-action">
+                  <svg class="i"><use href="#i-shield" /></svg>
+                  <input id="pwConfirm" type="password" autocomplete="new-password" spellcheck="false" maxlength="128" />
+                  <button type="button" class="input-action" data-toggle-pw="pwConfirm" aria-label="Show password"><svg class="i"><use href="#i-eye" /></svg></button>
+                </div>
+              </div>
+              <div class="pw-actions">
+                <button type="button" class="btn btn-primary" id="pwSave"><span class="spinner"></span><span class="btn-label">Update password</span></button>
+              </div>
+            </div>
           </section>
 
           <section class="panel" data-panel="danger" role="tabpanel" hidden>

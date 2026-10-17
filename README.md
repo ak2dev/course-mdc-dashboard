@@ -23,7 +23,7 @@ vercel.json      Output dir, bom1 region, /api rewrite, security headers
 | ------------------ | ----------------- | ----------------- | ------- |
 | `MONGODB_URI`      | On Vercel         | none              | Atlas connection string |
 | `MONGODB_DB`       | No                | `course_mdc`      | Database name |
-| `TEACHER_PASSWORD` | Strongly advised  | `***************` | Instructor key for faculty mode |
+| `TEACHER_PASSWORD` | Optional          | `***************` | Initial faculty password, used until one is set in Control Center → Security |
 
 The default password is published in the project spec, so set your own before the site goes public.
 
@@ -52,6 +52,7 @@ Open http://localhost:3000. Without a `.env.local` file, data is stored in `data
 | `npm run seed`   | Replace all data with 12 demo teams |
 | `npm run reset`  | Delete all projects |
 | `npm run import` | Copy `data/projects.json` into MongoDB (needs `MONGODB_URI`) |
+| `npm run reset-password` | Remove the password set in Control Center, so sign-in falls back to `TEACHER_PASSWORD` or the default |
 
 These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherwise. When using the JSON file, stop the server before running them.
 
@@ -77,6 +78,7 @@ After signing in, faculty get a **Control** button in the top bar. Every setting
 | Results | Publish or hide scores. While hidden, students see every project as Pending, a locked leaderboard and no class average; faculty views are unchanged |
 | Course | Course name (top bar, footer, page title) and an announcement banner shown to everyone |
 | Activity | Log of sign-ins, submissions, grades, edits, deletions and setting changes, kept for 180 days |
+| Security | Change the faculty password (current password required; at least 10 characters with letters and a number or symbol). Changing it signs out every other faculty session. Warns while the published default is still active |
 | Danger zone | CSV backup, sign out all faculty, clear all scores (type `RESET`), delete all projects (type `DELETE`) |
 
 Faculty can still add or edit teams while submissions are closed, and their edits aren't limited by team size or capacity. Settings live in the `settings` collection and the log in `activity`.
@@ -88,12 +90,13 @@ npm test                                          # against http://localhost:300
 BASE_URL=https://your-app.vercel.app npm test     # against a deployment
 ```
 
-This runs 51 end-to-end API checks covering the core API, both submission types and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`). Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
+This runs 57 end-to-end API checks covering the core API, both submission types and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`); after changing it in the Control Center, set `TEACHER_PASSWORD` to the new password when running the tests. Password changes only have their guards tested, so the suite never changes the real password. Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
 
 ## How it works on serverless
 
 - **Faculty sessions** are random tokens sent in the `x-teacher-token` header and kept only in page memory. The server stores a SHA-256 hash of each token in the `sessions` collection, which expires entries after 12 hours, so any function instance can check a token and signing out revokes it.
-- **Sign-in rate limiting** allows 8 attempts per minute per IP address, tracked in the `login_attempts` collection, which also expires old entries.
+- **Faculty password** set in the Control Center is stored as a salted scrypt hash in the `credentials` collection and never returned by the API. Forgot it? Run `npm run reset-password` with `MONGODB_URI` in `.env.local`, then sign in with `TEACHER_PASSWORD` or the default and set a new one.
+- **Sign-in rate limiting** allows 8 attempts per minute per IP address (password-change attempts count too), tracked in the `login_attempts` collection, which also expires old entries.
 - **Student submissions** need no login and always start as *Pending*.
 
 ## API

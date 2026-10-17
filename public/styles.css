@@ -1212,6 +1212,28 @@ button.eval:hover { background: var(--surface-hover); }
 .callout .i { margin-top: 2px; color: var(--text); }
 .callout strong { color: var(--text); font-weight: 500; }
 
+/* Security */
+.pw-form { display: grid; gap: 4px; max-width: 460px; margin-top: 18px; }
+.pw-form .field { margin-bottom: 10px; }
+.pw-meter { height: 4px; margin-top: 2px; border-radius: 999px; background: var(--surface-sunk); border: 1px solid var(--border); overflow: hidden; }
+.pw-meter span { display: block; height: 100%; width: 0; border-radius: inherit; background: var(--text); transition: width 0.25s ease; }
+.pw-actions { display: flex; justify-content: flex-start; margin-top: 4px; }
+.callout.warn { border-style: solid; border-color: var(--text); background: var(--surface-solid); color: var(--text); }
+.ov-alert {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--text);
+  color: var(--bg);
+}
+.ov-alert p { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.ov-alert .i { flex: none; }
+.ov-alert .btn { flex: none; color: var(--text); background: var(--bg); border-color: var(--bg); }
+
 /* Overview */
 .overview-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .ov-card { display: flex; flex-direction: column; gap: 4px; padding: 16px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface-sunk); }

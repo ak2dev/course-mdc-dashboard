@@ -182,7 +182,19 @@ async function controlSuite() {
     check('activity records actions', ['login', 'settings', 'submit', 'grade'].every((k) => kinds.has(k)), [...kinds].join(','));
     check('activity newest first', act.length > 1 && act[0].at >= act[act.length - 1].at);
 
-    check('reset scores needs RESET', (await call('POST', '/api/admin/reset-scores', { token, body: {} })).status === 400);
+    // Password changes: only the guards are exercised, so the real password is never changed.
+    check('security status unauth -> 401', (await call('GET', '/api/admin/security')).status === 401);
+    const sec = await call('GET', '/api/admin/security', { token });
+    check('security status reports password state', sec.status === 200 && typeof sec.data.customPassword === 'boolean' && typeof sec.data.usingDefault === 'boolean');
+    check('change password unauth -> 401', (await call('POST', '/api/admin/password', { body: { currentPassword: PW, newPassword: 'x' } })).status === 401);
+    check('wrong current password -> 403',
+      (await call('POST', '/api/admin/password', { token, body: { currentPassword: `wrong-${stamp}`, newPassword: `Fresh-${stamp}-pass` } })).status === 403);
+    const weak = await call('POST', '/api/admin/password', { token, body: { currentPassword: PW, newPassword: 'short' } });
+    check('weak new password -> 400', weak.status === 400, weak.data.error);
+    const dflt = await call('POST', '/api/admin/password', { token, body: { currentPassword: PW, newPassword: 'mdc@teacher2026' } });
+    check('default as new password -> 400', dflt.status === 400 || dflt.status === 403, dflt.data.error);
+
+    check('reset scores needs RESET',(await call('POST', '/api/admin/reset-scores', { token, body: {} })).status === 400);
     check('delete-all needs DELETE', (await call('POST', '/api/admin/delete-all', { token, body: { confirm: 'delete' } })).status === 400);
 
     // Signing everyone out would disrupt real faculty, so only exercise it locally.

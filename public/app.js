@@ -46,6 +46,7 @@
     editingId: null,
     confirmHandler: null,
     controlTab: 'overview',
+    security: null,
     afterLogin: null,
     lastPayload: '',
   };
@@ -1128,7 +1129,7 @@
   /* ======================================================= control center */
 
   const SETTING_FIELDS = ['submissionsOpen', 'deadline', 'capacity', 'maxTeamSize', 'resultsPublished', 'courseName', 'announcement'];
-  const ACTIVITY_ICONS = { login: 'lock', submit: 'plus', grade: 'star', edit: 'edit', delete: 'trash', settings: 'sliders', danger: 'alert' };
+  const ACTIVITY_ICONS = { login: 'lock', submit: 'plus', grade: 'star', edit: 'edit', delete: 'trash', settings: 'sliders', danger: 'alert', security: 'shield' };
 
   const pad = (n) => String(n).padStart(2, '0');
   function isoToLocalInput(iso) {
@@ -1201,6 +1202,11 @@
     const status = submissionStatus();
     const pct = Math.min(100, Math.round((stats.students / s.capacity) * 100));
     $('#overviewGrid').innerHTML = `
+      ${state.security?.usingDefault ? `
+      <div class="ov-alert">
+        <p>${icon('alert')}<span><strong>The default faculty password is still active.</strong> Anyone who has seen it can sign in and change grades.</span></p>
+        <button type="button" class="btn btn-sm" data-goto-tab="security">Change password</button>
+      </div>` : ''}
       <div class="ov-card">
         <span class="ov-label">${icon('calendar')} Submissions</span>
         <span class="ov-value"><i class="state-dot ${status.open ? '' : 'off'}"></i>${status.open ? 'Open' : 'Closed'}</span>
@@ -1258,6 +1264,7 @@
     $$('#controlDialog [data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== tab; });
     if (tab === 'overview') renderOverview();
     if (tab === 'activity') loadActivity();
+    if (tab === 'security') loadSecurity();
   }
 
   function openControl(tab = state.controlTab) {
@@ -1265,6 +1272,100 @@
     fillControlForm();
     showControlTab(tab);
     if (!el.controlDialog.open) el.controlDialog.showModal();
+    if (tab !== 'security') loadSecurity();
+  }
+
+  /* -------------------------------------------------------- security tab */
+
+  async function loadSecurity() {
+    try {
+      state.security = await api('/api/admin/security');
+    } catch {
+      return;
+    }
+    renderSecurityStatus();
+    if (el.controlDialog.open && state.controlTab === 'overview') renderOverview();
+  }
+
+  function renderSecurityStatus() {
+    const s = state.security;
+    const box = $('#securityStatus');
+    if (!s) return;
+    box.classList.toggle('warn', s.usingDefault);
+    box.innerHTML = s.usingDefault
+      ? `${icon('alert')}<p><strong>The default password is still active.</strong> It appears in the course spec, so anyone who has seen it can sign in. Set a new one below.</p>`
+      : s.customPassword
+        ? `${icon('shield')}<p><strong>Custom password in use.</strong> Last changed ${esc(absTime(s.changedAt))} (${relTime(s.changedAt)}).</p>`
+        : `${icon('shield')}<p><strong>Using the password from the server's TEACHER_PASSWORD setting.</strong> A password set here replaces it.</p>`;
+  }
+
+  // 0–4: length ≥10, length ≥14, mixed case, number or symbol beyond letters.
+  function passwordScore(pw) {
+    if (!pw) return 0;
+    let score = 0;
+    if (pw.length >= 10) score++;
+    if (pw.length >= 14) score++;
+    if (/[a-z]/.test(pw) && /[A-Z]/.test(pw)) score++;
+    if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+    return score;
+  }
+
+  function updatePasswordMeter() {
+    const pw = $('#pwNew').value;
+    const score = passwordScore(pw);
+    const meetsRules = pw.length >= 10 && /[A-Za-z]/.test(pw) && /[^A-Za-z]/.test(pw);
+    $('#pwMeterBar').style.width = pw ? `${Math.max(12, score * 25)}%` : '0';
+    $('#pwHint').textContent = !pw
+      ? 'At least 10 characters, with letters and a number or symbol.'
+      : !meetsRules
+        ? 'Too weak: use at least 10 characters with letters and a number or symbol.'
+        : ['Acceptable', 'Acceptable', 'Good', 'Strong', 'Very strong'][score] + ' password.';
+  }
+
+  function clearPasswordForm() {
+    ['#pwCurrent', '#pwNew', '#pwConfirm'].forEach((sel) => {
+      const input = $(sel);
+      input.value = '';
+      input.type = 'password';
+      input.closest('.field').classList.remove('invalid');
+    });
+    updatePasswordMeter();
+  }
+
+  async function changePassword() {
+    const btn = $('#pwSave');
+    if (btn.disabled) return;
+    const current = $('#pwCurrent').value;
+    const next = $('#pwNew').value;
+    const confirmValue = $('#pwConfirm').value;
+    const fields = { current: $('#pwCurrent'), next: $('#pwNew'), confirm: $('#pwConfirm') };
+    Object.values(fields).forEach((f) => f.closest('.field').classList.remove('invalid'));
+
+    const fail = (field, title, message) => {
+      field.closest('.field').classList.add('invalid');
+      field.focus();
+      toast(title, message, 'error');
+    };
+    if (!current) return fail(fields.current, 'Enter your current password', '');
+    if (next.length < 10 || !/[A-Za-z]/.test(next) || !/[^A-Za-z]/.test(next)) {
+      return fail(fields.next, 'New password is too weak', 'Use at least 10 characters with letters and a number or symbol.');
+    }
+    if (next === current) return fail(fields.next, 'Choose a different password', 'The new password matches the current one.');
+    if (next !== confirmValue) return fail(fields.confirm, 'Passwords don’t match', 'Re-type the new password to confirm it.');
+
+    setBusy(btn, true, 'Updating…');
+    try {
+      const { token } = await api('/api/admin/password', { method: 'POST', body: { currentPassword: current, newPassword: next } });
+      setToken(token, { reload: false });
+      clearPasswordForm();
+      toast('Password updated', 'All other faculty sessions were signed out. Use the new password from now on.', 'success');
+      await loadSecurity();
+    } catch (err) {
+      if (/current password/i.test(err.message)) fields.current.closest('.field').classList.add('invalid');
+      toast('Could not change password', err.message, 'error');
+    } finally {
+      setBusy(btn, false);
+    }
   }
 
   async function saveSettings(patch, { quiet = false } = {}) {
@@ -1648,7 +1749,26 @@
   $('#overviewGrid').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-quick]');
     if (btn) quickToggle(btn.dataset.quick, btn);
+    const go = e.target.closest('[data-goto-tab]');
+    if (go) showControlTab(go.dataset.gotoTab);
   });
+
+  // Security tab. The fields live inside the settings form, so Enter must not submit it.
+  $('#pwSave').addEventListener('click', changePassword);
+  $('#pwNew').addEventListener('input', updatePasswordMeter);
+  $$('.pw-form input').forEach((input) => input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      changePassword();
+    }
+  }));
+  $$('[data-toggle-pw]').forEach((btn) => btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.togglePw);
+    input.type = input.type === 'password' ? 'text' : 'password';
+    btn.setAttribute('aria-label', input.type === 'password' ? 'Show password' : 'Hide password');
+    input.focus();
+  }));
+  el.controlDialog.addEventListener('close', clearPasswordForm);
   $$('[data-danger]').forEach((b) => b.addEventListener('click', () => dangerAction(b.dataset.danger)));
   $('#qSave').addEventListener('click', () => saveQuickGrade(false));
   $('#qSaveNext').addEventListener('click', () => saveQuickGrade(true));
