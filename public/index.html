@@ -80,8 +80,10 @@
         <div class="pills reveal" id="statusPills" style="--d:0ms">
           <span class="eyebrow"><i class="pulse"></i> Live board · auto-refreshing</span>
         </div>
+        <p class="hero-program reveal" id="heroProgram" style="--d:30ms">B.Tech CSE · Cyber Security</p>
         <h1 class="reveal" style="--d:60ms">Project <span class="grad-text">Showcase</span></h1>
-        <p class="lede reveal" id="lede" style="--d:120ms">Submissions, live device previews and tiered evaluations for the Course MDC cohort.</p>
+        <div class="hero-meta reveal" id="heroMeta" style="--d:100ms"></div>
+        <p class="lede reveal" id="lede" style="--d:130ms">Submissions, live device previews and tiered evaluations for the Course MDC cohort.</p>
         <div class="hero-actions reveal" style="--d:180ms">
           <button class="btn btn-secondary" type="button" data-open="rubric">
             <svg class="i"><use href="#i-book" /></svg> Grading rubric
@@ -89,6 +91,10 @@
           <button class="btn btn-secondary" type="button" data-export>
             <svg class="i"><use href="#i-download" /></svg> Export CSV
           </button>
+          <a class="btn btn-secondary" href="https://github.com/ak2dev/course-mdc-dashboard" target="_blank" rel="noopener noreferrer"
+            title="Source code of this dashboard on GitHub">
+            <svg class="i"><use href="#i-github" /></svg> Source on GitHub
+          </a>
         </div>
       </div>
       <aside class="cohort reveal" id="cohort" style="--d:140ms" aria-label="Cohort enrollment"></aside>
@@ -127,6 +133,7 @@
         <button type="button" class="link-btn" data-open="rubric">Grading rubric</button>
         <button type="button" class="link-btn" data-export>Export CSV</button>
         <button type="button" class="link-btn" id="footerFaculty">Faculty access</button>
+        <a class="link-btn" href="https://github.com/ak2dev/course-mdc-dashboard" target="_blank" rel="noopener noreferrer">GitHub</a>
       </nav>
     </div>
     <div class="container footer-credit">
@@ -490,6 +497,21 @@
               <label for="cCourseName">Course name</label>
               <input id="cCourseName" name="courseName" maxlength="60" required />
             </div>
+            <div class="course-details">
+              <div class="field">
+                <label for="cProgram">Program</label>
+                <input id="cProgram" name="program" maxlength="80" placeholder="e.g. B.Tech CSE · Cyber Security" />
+              </div>
+              <div class="field">
+                <label for="cSemester">Semester</label>
+                <input id="cSemester" name="semester" maxlength="40" placeholder="e.g. 3rd Semester" />
+              </div>
+              <div class="field">
+                <label for="cBatch">Batch</label>
+                <input id="cBatch" name="batch" maxlength="40" placeholder="e.g. 2024–2028" />
+              </div>
+            </div>
+            <p class="hint course-details-hint">Shown in the homepage heading. Leave a field empty to hide it.</p>
             <div class="field">
               <div class="label-row">
                 <label for="cAnnouncement">Announcement banner</label>

@@ -129,6 +129,7 @@ async function controlSuite() {
   const restore = {
     courseName: s0.courseName, submissionsOpen: s0.submissionsOpen, deadline: s0.deadline, capacity: s0.capacity,
     maxTeamSize: s0.maxTeamSize, resultsPublished: s0.resultsPublished, announcement: s0.announcement,
+    program: s0.program, semester: s0.semester, batch: s0.batch,
   };
 
   try {
@@ -173,6 +174,10 @@ async function controlSuite() {
     await call('PATCH', '/api/admin/settings', { token, body: { resultsPublished: true } });
     check('published: students see score', (await call('GET', '/api/projects')).data.projects.find((p) => p.id === studentId).score === 9.2);
 
+    r = await call('PATCH', '/api/admin/settings', { token, body: { program: '  B.Tech  Test ', semester: '5th Semester', batch: 'Batch 2030' } });
+    check('course details saved (program/semester/batch)',
+      r.data.settings.program === 'B.Tech Test' && r.data.settings.semester === '5th Semester' && r.data.settings.batch === '2030',
+      JSON.stringify([r.data.settings.program, r.data.settings.semester, r.data.settings.batch]));
     r = await call('PATCH', '/api/admin/settings', { token, body: { announcement: '  Demo   day is Friday  ', courseName: 'MDC Test' } });
     check('announcement + name normalised', r.data.settings.announcement === 'Demo day is Friday' && r.data.settings.courseName === 'MDC Test');
 

@@ -76,7 +76,7 @@ After signing in, faculty get a **Control** button in the top bar. Every setting
 | Overview | Live status with one-click toggles to open/close submissions and publish/hide results |
 | Submissions | Accept submissions on/off, an automatic deadline, course capacity, maximum team size |
 | Results | Publish or hide scores. While hidden, students see every project as Pending, a locked leaderboard and no class average; faculty views are unchanged |
-| Course | Course name (top bar, footer, page title) and an announcement banner shown to everyone |
+| Course | Course name (top bar, footer, page title), the homepage heading details (program, semester, batch) and an announcement banner shown to everyone |
 | Activity | Log of sign-ins, submissions, grades, edits, deletions and setting changes, kept for 180 days |
 | Security | Change the faculty password (current password required; at least 10 characters with letters and a number or symbol). Changing it signs out every other faculty session. Warns while the published default is still active |
 | Danger zone | CSV backup, sign out all faculty, clear all scores (type `RESET`), delete all projects (type `DELETE`) |

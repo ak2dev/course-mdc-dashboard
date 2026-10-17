@@ -30,6 +30,9 @@
     maxTeamSize: 8,
     resultsPublished: true,
     announcement: '',
+    program: 'B.Tech CSE · Cyber Security',
+    semester: '3rd Semester',
+    batch: '2025–2029',
   };
 
   const state = {
@@ -331,6 +334,16 @@
     $('#footerName').textContent = s.courseName;
     $('#footerMark').textContent = s.courseName;
     $('#lede').textContent = `Submissions, live device previews and tiered evaluations for the ${s.courseName} cohort.`;
+
+    // Heading details: program above the title, semester / batch / course as chips below.
+    $('#heroProgram').innerHTML = `${icon('shield')}<span>${esc(s.program)}</span>`;
+    $('#heroProgram').hidden = !s.program;
+    const chips = [
+      s.semester && [icon('calendar'), s.semester],
+      s.batch && [icon('users'), `Batch ${s.batch}`],
+      s.courseName && [icon('book'), s.courseName],
+    ].filter(Boolean);
+    $('#heroMeta').innerHTML = chips.map(([ico, text]) => `<span class="meta-chip">${ico}${esc(text)}</span>`).join('');
     document.title = `${s.courseName} · Project Showcase`;
 
     $('#announce').hidden = !s.announcement;
@@ -1128,7 +1141,7 @@
 
   /* ======================================================= control center */
 
-  const SETTING_FIELDS = ['submissionsOpen', 'deadline', 'capacity', 'maxTeamSize', 'resultsPublished', 'courseName', 'announcement'];
+  const SETTING_FIELDS = ['submissionsOpen', 'deadline', 'capacity', 'maxTeamSize', 'resultsPublished', 'courseName', 'announcement', 'program', 'semester', 'batch'];
   const ACTIVITY_ICONS = { login: 'lock', submit: 'plus', grade: 'star', edit: 'edit', delete: 'trash', settings: 'sliders', danger: 'alert', security: 'shield' };
 
   const pad = (n) => String(n).padStart(2, '0');
@@ -1148,6 +1161,9 @@
       resultsPublished: f.resultsPublished.checked,
       courseName: f.courseName.value.trim(),
       announcement: f.announcement.value.trim().replace(/\s+/g, ' '),
+      program: f.program.value.trim().replace(/\s+/g, ' '),
+      semester: f.semester.value.trim().replace(/\s+/g, ' '),
+      batch: f.batch.value.trim().replace(/\s+/g, ' ').replace(/^batch\s*/i, ''),
     };
   }
 
@@ -1186,6 +1202,9 @@
     f.resultsPublished.checked = s.resultsPublished;
     f.courseName.value = s.courseName;
     f.announcement.value = s.announcement;
+    f.program.value = s.program;
+    f.semester.value = s.semester;
+    f.batch.value = s.batch;
     updateControlDirty();
   }
 
