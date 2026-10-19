@@ -620,9 +620,12 @@
   function notesButton(p) {
     if (!p.reviewerNotes) return '';
     const hiddenForTeam = isTeacher() && !notesVisibleToTeam(p);
-    return `<button type="button" class="notes-chip ${hiddenForTeam ? 'is-hidden' : ''}" data-action="notes" data-id="${p.id}"
-      title="${hiddenForTeam ? 'Not visible to students yet (needs a score and published results)' : 'Read the reviewer feedback'}">
-      ${icon('message')}<span>Feedback</span></button>`;
+    // Icon-only, so the label lives in the tooltip and the accessible name.
+    const label = hiddenForTeam
+      ? `Reviewer feedback for ${p.teamName} (not visible to students yet: needs a score and published results)`
+      : `Read reviewer feedback for ${p.teamName}`;
+    return `<button type="button" class="notes-icon ${hiddenForTeam ? 'is-hidden' : ''}" data-action="notes" data-id="${p.id}"
+      title="${esc(hiddenForTeam ? 'Feedback · not visible to students yet' : 'Read feedback')}" aria-label="${esc(label)}">${icon('message')}</button>`;
   }
 
   function evalCell(p) {
