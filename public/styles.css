@@ -1412,7 +1412,7 @@ button.eval:hover { background: var(--surface-hover); }
   cursor: pointer;
   transition: color 0.15s, background-color 0.15s;
 }
-.notes-chip .i { width: 12px; height: 12px; }
+.notes-chip .i { width: 13px; height: 13px; }
 .notes-chip:hover { color: var(--text); background: var(--surface-hover); }
 .notes-chip.is-hidden { opacity: 0.6; text-decoration: underline dotted; text-underline-offset: 3px; }
 .p-notes.is-hidden { border-style: dashed; color: var(--text-3); box-shadow: none; }
