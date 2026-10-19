@@ -11,7 +11,8 @@
     "reset": "node scripts/seed.js --empty",
     "import": "node scripts/seed.js --import",
     "test": "node tests/smoke.js",
-    "reset-password": "node scripts/reset-password.js"
+    "reset-password": "node scripts/reset-password.js",
+    "test:unit": "node --test tests/*.test.js"
   },
   "engines": {
     "node": ">=20.12"

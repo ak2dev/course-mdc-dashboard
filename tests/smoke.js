@@ -188,6 +188,34 @@ async function controlSuite() {
     check('activity records actions', ['login', 'settings', 'submit', 'grade'].every((k) => kinds.has(k)), [...kinds].join(','));
     check('activity newest first', act.length > 1 && act[0].at >= act[act.length - 1].at);
 
+    // Class roster: guards everywhere; the full flow only locally so a real roster is never replaced.
+    check('roster endpoints require faculty -> 401',
+      (await call('GET', '/api/admin/roster')).status === 401 &&
+      (await call('PUT', '/api/admin/roster', { body: { students: [{ name: 'X' }] } })).status === 401 &&
+      (await call('POST', '/api/admin/roster/preview', { body: { text: 'X' } })).status === 401 &&
+      (await call('DELETE', '/api/admin/roster')).status === 401);
+    const notRoster = await call('POST', '/api/admin/roster/preview', { token, body: { fileName: 'x.xlsx', base64: Buffer.from('not a spreadsheet').toString('base64') } });
+    check('roster preview rejects a non-spreadsheet file -> 400', notRoster.status === 400, notRoster.data.error);
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:|$|\/)/.test(BASE)) {
+      const before = (await call('GET', '/api/admin/roster', { token })).data;
+      const prev = await call('POST', '/api/admin/roster/preview', {
+        token, body: { text: `Roll Number\tStudent Name\nR-${stamp}-1\tMr. Hal ${stamp}\nR-${stamp}-2\tMs. Ida ${stamp}\nR-${stamp}-3\tMr. Nobody ${stamp}` },
+      });
+      check('roster preview parses pasted Excel rows', prev.status === 200 && prev.data.students.length === 3 && prev.data.columns.rollNo === 'Roll Number');
+      const saved = await call('PUT', '/api/admin/roster', { token, body: { students: prev.data.students, source: 'smoke test' } });
+      const s = saved.data.report?.summary;
+      check('roster report: submitted vs missing', saved.status === 200 && s.total === 3 && s.submitted === 2 && s.missing === 1, JSON.stringify(s));
+      check('roster never appears in public data', !JSON.stringify((await call('GET', '/api/projects')).data).includes(`Nobody ${stamp}`));
+      if (before.roster) {
+        // Put back the roster that existed before the test.
+        const original = before.report.students.map(({ name, rollNo, email }) => ({ name, rollNo, email }));
+        const back = await call('PUT', '/api/admin/roster', { token, body: { students: original, source: before.roster.source } });
+        check('previous roster restored', back.status === 200 && back.data.roster.count === before.roster.count);
+      } else {
+        check('roster removed', (await call('DELETE', '/api/admin/roster', { token })).data.removed === true);
+      }
+    }
+
     // Password changes: only the guards are exercised, so the real password is never changed.
     check('security status unauth -> 401', (await call('GET', '/api/admin/security')).status === 401);
     const sec = await call('GET', '/api/admin/security', { token });

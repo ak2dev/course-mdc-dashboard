@@ -4,3 +4,7 @@ data/
 !.env.example
 .vercel/
 .claude/
+
+# Class lists contain student data; keep them out of the repo
+*.xlsx
+*.xls
