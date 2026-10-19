@@ -611,13 +611,40 @@
     </div>`;
   }
 
+  // Students only receive notes once they're visible; faculty always have them.
+  const notesVisibleToTeam = (p) => p.score !== null && p.score !== undefined && state.settings.resultsPublished;
+
+  function notesButton(p) {
+    if (!p.reviewerNotes) return '';
+    const hiddenForTeam = isTeacher() && !notesVisibleToTeam(p);
+    return `<button type="button" class="notes-chip ${hiddenForTeam ? 'is-hidden' : ''}" data-action="notes" data-id="${p.id}"
+      title="${hiddenForTeam ? 'Not visible to students yet (needs a score and published results)' : 'Read the reviewer feedback'}">
+      ${icon('message')}<span>Feedback</span></button>`;
+  }
+
   function evalCell(p) {
     const inner = p.score === null
       ? '<span class="awaiting">Awaiting review</span>'
       : `${badge(p.score)}<span class="score">${fmtScore(p.score)}</span>`;
-    return isTeacher()
+    const evaluation = isTeacher()
       ? `<button type="button" class="eval" data-action="grade" data-id="${p.id}" title="Grade in preview">${inner}</button>`
       : `<span class="eval">${inner}</span>`;
+    return `<div class="eval-wrap">${evaluation}${notesButton(p)}</div>`;
+  }
+
+  function openNotes(p) {
+    if (!p?.reviewerNotes) return;
+    const t = tierOf(p.score);
+    $('#notesTitle').textContent = p.teamName;
+    $('#notesBody').innerHTML = `
+      <div class="notes-head">
+        ${ring(p.score, 52, 4)}
+        <div class="sp-text"><strong>${esc(p.title)}</strong>${badge(p.score)}</div>
+      </div>
+      <p class="notes-text">${esc(p.reviewerNotes)}</p>
+      ${isTeacher() && !notesVisibleToTeam(p) ? `<p class="hint">${icon('eye-off')} Students can't see this yet: it appears once the project has a score and results are published.</p>` : ''}
+      ${p.gradedAt ? `<p class="notes-meta">Graded ${esc(absTime(p.gradedAt))}${t.key !== 'pending' ? ` · ${esc(t.range)}` : ''}</p>` : ''}`;
+    $('#notesDialog').showModal();
   }
 
   function teacherActions(p) {
@@ -669,6 +696,10 @@
             ${ring(p.score, 56, 4)}
           </div>
           <div>${badge(p.score)}</div>
+          ${p.reviewerNotes ? `<button type="button" class="p-notes ${isTeacher() && !notesVisibleToTeam(p) ? 'is-hidden' : ''}" data-action="notes" data-id="${p.id}" title="Read the full reviewer feedback">
+            <span class="p-notes-label">${icon('message')} Reviewer feedback</span>
+            <span class="p-notes-text">${esc(p.reviewerNotes)}</span>
+          </button>` : ''}
           ${techs.length ? `<div class="tags-row">${techs.map((s) => `<span class="tech">${esc(s)}</span>`).join('')}</div>` : ''}
           <div class="p-card-members">
             <div class="label">${icon('users')} ${p.members.length} member${p.members.length === 1 ? '' : 's'}</div>
@@ -1539,6 +1570,8 @@
     quickScore.set(p.score);
     $('#qNotes').value = p.reviewerNotes || '';
     $('#qSaveNext').disabled = !nextPending(p.id);
+    $('#previewNotesBlock').hidden = !p.reviewerNotes;
+    $('#previewNotes').textContent = p.reviewerNotes || '';
   }
 
   function showFrameBlocked(title, reason) {
@@ -1835,6 +1868,7 @@
     if (!target) return;
     const { action, id } = target.dataset;
     if (action === 'preview' || action === 'grade') openPreview(id);
+    else if (action === 'notes') openNotes(find(id));
     else if (action === 'edit') openSubmit(find(id));
     else if (action === 'delete') confirmDelete(find(id));
     else if (action === 'submit') openSubmit();

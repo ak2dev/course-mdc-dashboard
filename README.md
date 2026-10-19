@@ -98,13 +98,14 @@ This runs 57 end-to-end API checks covering the core API, both submission types 
 - **Faculty password** set in the Control Center is stored as a salted scrypt hash in the `credentials` collection and never returned by the API. Forgot it? Run `npm run reset-password` with `MONGODB_URI` in `.env.local`, then sign in with `TEACHER_PASSWORD` or the default and set a new one.
 - **Sign-in rate limiting** allows 8 attempts per minute per IP address (password-change attempts count too), tracked in the `login_attempts` collection, which also expires old entries.
 - **Student submissions** need no login and always start as *Pending*.
+- **Reviewer notes** are feedback for the team. They appear on the dashboard (a **Feedback** button in the table, an excerpt on Showcase cards and the preview panel) once the project is graded and results are published; until then only faculty can see them.
 
 ## API
 
 | Method   | Path                    | Auth    |
 | -------- | ----------------------- | ------- |
 | `GET`    | `/api/health`           | public  |
-| `GET`    | `/api/projects`         | public (reviewer notes only sent to faculty) |
+| `GET`    | `/api/projects`         | public (reviewer notes included once a project is graded and results are published) |
 | `POST`   | `/api/projects`         | public  |
 | `PATCH`  | `/api/projects/:id`     | faculty |
 | `DELETE` | `/api/projects/:id`     | faculty |

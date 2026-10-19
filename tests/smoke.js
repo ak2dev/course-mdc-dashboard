@@ -97,7 +97,7 @@ async function coreSuite() {
   check('score 11 -> 400', (await call('PATCH', `/api/projects/${id}`, { token, body: { score: 11 } })).status === 400);
 
   const mine = (await call('GET', '/api/projects')).data.projects.find((p) => p.id === id);
-  check('public list hides notes + internal keys', mine && !('reviewerNotes' in mine) && !('teamKey' in mine) && !('_id' in mine));
+  check('graded team: notes visible to everyone, internal keys hidden', mine && mine.reviewerNotes === 'smoke' && !('teamKey' in mine) && !('_id' in mine));
   const priv = await call('GET', '/api/projects', { token });
   check('faculty list includes notes', priv.data.teacher === true && priv.data.projects.find((p) => p.id === id)?.reviewerNotes === 'smoke');
 
@@ -165,14 +165,15 @@ async function controlSuite() {
     r = await call('POST', '/api/projects', { body: team('F', ['Jo']) });
     check('capacity enforced -> 409', r.status === 409 && /capacity/i.test(r.data.error), r.data.error);
 
-    await call('PATCH', `/api/projects/${studentId}`, { token, body: { score: 9.2 } });
+    await call('PATCH', `/api/projects/${studentId}`, { token, body: { score: 9.2, reviewerNotes: 'cc feedback' } });
     await call('PATCH', '/api/admin/settings', { token, body: { resultsPublished: false } });
     const pub = (await call('GET', '/api/projects')).data.projects.find((p) => p.id === studentId);
     const fac = (await call('GET', '/api/projects', { token })).data.projects.find((p) => p.id === studentId);
-    check('hidden results: students see no score', pub.score === null && pub.status === 'pending');
+    check('hidden results: students see no score or notes', pub.score === null && pub.status === 'pending' && !('reviewerNotes' in pub));
     check('hidden results: faculty still see score', fac.score === 9.2);
     await call('PATCH', '/api/admin/settings', { token, body: { resultsPublished: true } });
-    check('published: students see score', (await call('GET', '/api/projects')).data.projects.find((p) => p.id === studentId).score === 9.2);
+    const pub2 = (await call('GET', '/api/projects')).data.projects.find((p) => p.id === studentId);
+    check('published: students see score + notes', pub2.score === 9.2 && pub2.reviewerNotes === 'cc feedback');
 
     r = await call('PATCH', '/api/admin/settings', { token, body: { program: '  B.Tech  Test ', semester: '5th Semester', batch: 'Batch 2030' } });
     check('course details saved (program/semester/batch)',
