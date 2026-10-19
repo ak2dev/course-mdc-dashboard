@@ -97,6 +97,19 @@ test('a unique first name alone is a possible match; a shared first name is ambi
   assert.deepEqual(r.unmatched, [{ name: 'Priya', team: 'Alpha', reason: 'ambiguous' }]);
 });
 
+test('names split or joined differently match ("Har Preet" / "Harpreet")', () => {
+  const roster = [
+    { name: 'MR. HAR PREET GILL', rollNo: 'R10', email: '' },
+    { name: 'Ms. Navjot Kaur Sandhu', rollNo: 'R11', email: '' },
+    { name: 'Mr. Gur Dev Bains', rollNo: 'R12', email: '' },
+  ];
+  const r = matchRoster(roster, [project('p1', 'Alpha', ['Harpreet Gill', 'Nav Jot Kaur Sandhu', 'Gurdev'])]);
+  assert.equal(statusOf(r, 'MR. HAR PREET GILL'), 'submitted', 'joined in the submission');
+  assert.equal(statusOf(r, 'Ms. Navjot Kaur Sandhu'), 'submitted', 'split in the submission');
+  assert.equal(statusOf(r, 'Mr. Gur Dev Bains'), 'possible', 'lone first name written joined');
+  assert.deepEqual(r.unmatched, []);
+});
+
 test('roll numbers typed as member names match exactly', () => {
   const r = matchRoster(ROSTER, [project('p1', 'Alpha', ['2025a1r007'])]);
   assert.equal(statusOf(r, 'Mr. Zubin Mehta'), 'submitted');

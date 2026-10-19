@@ -98,8 +98,11 @@
     return h;
   }
 
+  // Leading titles are skipped, so "MR. HAR PREET GILL" → "HG", not "MG".
+  const TITLE = /^(mr|mrs|ms|miss|mx|dr|shri|sri|smt|kumari)\.?$/i;
   function initials(name) {
     const parts = name.trim().split(/\s+/);
+    while (parts.length > 1 && TITLE.test(parts[0])) parts.shift();
     return ((parts[0]?.[0] || '') + (parts.length > 1 ? parts[parts.length - 1][0] : parts[0]?.[1] || '')).toUpperCase();
   }
 
