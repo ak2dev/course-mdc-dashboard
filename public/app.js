@@ -1280,7 +1280,28 @@
         <span class="ov-value">${stats.graded} <span class="muted" style="font-size:14px;font-weight:500">/ ${stats.teams} graded</span></span>
         <span class="ov-sub">${stats.pending ? `${stats.pending} awaiting review` : 'All caught up'}${stats.avg === null ? '' : ` · average ${fmtScore(stats.avg)}`}</span>
         <div class="progress"><span style="width:${stats.teams ? Math.round((stats.graded / stats.teams) * 100) : 0}%"></span></div>
+      </div>
+      ${rosterOverviewCard()}`;
+  }
+
+  function rosterOverviewCard() {
+    const data = rosterState.data;
+    if (!data) return '';
+    if (!data.roster) {
+      return `<div class="ov-card ov-wide">
+        <span class="ov-label">${icon('users')} Roster</span>
+        <span class="ov-sub">Upload the class list to see which students haven’t submitted yet.</span>
+        <button type="button" class="btn btn-secondary btn-sm" data-goto-tab="roster">Upload class list</button>
       </div>`;
+    }
+    const s = data.report.summary;
+    return `<div class="ov-card ov-wide">
+      <span class="ov-label">${icon('users')} Roster</span>
+      <span class="ov-value">${s.submitted} <span class="muted" style="font-size:14px;font-weight:500">/ ${s.total} submitted</span></span>
+      <span class="ov-sub"><strong>${s.missing}</strong> not submitted${s.possible ? ` · ${s.possible} possible match${s.possible === 1 ? '' : 'es'} to confirm` : ''}</span>
+      <div class="progress"><span style="width:${s.total ? Math.round((s.submitted / s.total) * 100) : 0}%"></span></div>
+      <button type="button" class="btn btn-secondary btn-sm" data-goto-tab="roster">View who hasn’t submitted</button>
+    </div>`;
   }
 
   async function loadActivity() {
@@ -1315,6 +1336,7 @@
     if (tab === 'overview') renderOverview();
     if (tab === 'activity') loadActivity();
     if (tab === 'security') loadSecurity();
+    if (tab === 'roster') loadRoster();
   }
 
   function openControl(tab = state.controlTab) {
@@ -1323,6 +1345,199 @@
     showControlTab(tab);
     if (!el.controlDialog.open) el.controlDialog.showModal();
     if (tab !== 'security') loadSecurity();
+    if (tab !== 'roster') loadRoster();
+  }
+
+  /* ---------------------------------------------------------- roster tab */
+
+  const rosterState = { data: null, filter: 'missing', query: '', preview: null, replacing: false };
+  const ROSTER_LABELS = { missing: 'Not submitted', possible: 'Possible match', submitted: 'Submitted' };
+
+  async function loadRoster() {
+    try {
+      rosterState.data = await api('/api/admin/roster');
+    } catch {
+      return;
+    }
+    renderRoster();
+    if (el.controlDialog.open && state.controlTab === 'overview') renderOverview();
+  }
+
+  function renderRoster() {
+    const has = Boolean(rosterState.data?.roster);
+    const preview = rosterState.preview;
+    $('#rosterPreview').hidden = !preview;
+    $('#rosterImport').hidden = Boolean(preview) || (has && !rosterState.replacing);
+    $('#rosterReport').hidden = Boolean(preview) || !has || rosterState.replacing;
+    $('#rosterTools').hidden = Boolean(preview) || !has || rosterState.replacing;
+    $('#rosterCancelReplace').hidden = !(has && rosterState.replacing);
+    if (preview) renderRosterPreview();
+    else if (has && !rosterState.replacing) renderRosterReport();
+  }
+
+  function renderRosterPreview() {
+    const { students, columns, source } = rosterState.preview;
+    const detected = [['Name', columns.name], ['Roll number', columns.rollNo], ['Email', columns.email]]
+      .filter(([, c]) => c).map(([k, c]) => `${k} ← “${esc(c)}”`).join(' · ');
+    $('#rosterPreview').innerHTML = `
+      <h4>Found ${students.length} student${students.length === 1 ? '' : 's'}</h4>
+      <p>${esc(source)}${detected ? ` · ${detected}` : ' · single column of names'}</p>
+      <table>
+        <thead><tr><th>Name</th><th>Roll number</th><th>Email</th></tr></thead>
+        <tbody>${students.slice(0, 5).map((s) => `<tr><td>${esc(s.name)}</td><td>${esc(s.rollNo || '—')}</td><td>${esc(s.email || '—')}</td></tr>`).join('')}</tbody>
+      </table>
+      ${students.length > 5 ? `<p>…and ${students.length - 5} more.</p>` : ''}
+      <div class="actions">
+        <button type="button" class="btn btn-primary btn-sm" data-roster="save"><span class="spinner"></span><span class="btn-label">${rosterState.data?.roster ? 'Replace roster' : 'Save roster'}</span></button>
+        <button type="button" class="btn btn-ghost btn-sm" data-roster="discard">Cancel</button>
+      </div>`;
+  }
+
+  function rosterMatches(s) {
+    const q = rosterState.query.trim().toLowerCase();
+    return (rosterState.filter === 'all' || s.status === rosterState.filter)
+      && (!q || [s.name, s.rollNo, s.email].some((v) => (v || '').toLowerCase().includes(q)));
+  }
+
+  function renderRosterReport() {
+    const { roster, report } = rosterState.data;
+    const { summary } = report;
+    const cards = [['missing', 'Not submitted', summary.missing], ['possible', 'Possible match', summary.possible],
+      ['submitted', 'Submitted', summary.submitted], ['all', 'All students', summary.total]];
+    $('#rosterSummary').innerHTML = cards.map(([key, label, n]) => `
+      <button type="button" role="tab" aria-selected="${rosterState.filter === key}" class="rs-card ${key} ${rosterState.filter === key ? 'active' : ''}" data-roster-filter="${key}">
+        <span>${label}</span><strong>${n}</strong>
+      </button>`).join('');
+
+    const list = report.students.filter(rosterMatches);
+    $('#rosterList').innerHTML = list.length
+      ? list.map((s) => {
+        const m = s.matches[0];
+        const detail = m
+          ? `Team <b>${esc(m.team)}</b>${s.status === 'possible' || m.member.trim().toLowerCase() !== s.name.trim().toLowerCase() ? ` · entered as “${esc(m.member)}”` : ''}${s.matches.length > 1 ? ` · +${s.matches.length - 1} more` : ''}`
+          : esc([s.rollNo, s.email].filter(Boolean).join(' · ') || 'No submission found');
+        return `<li class="roster-row">${avatar(s.name)}
+          <div class="who"><strong>${esc(s.name)}</strong><small>${s.rollNo && m ? `${esc(s.rollNo)} · ` : ''}${detail}</small></div>
+          <span class="r-status ${s.status}">${ROSTER_LABELS[s.status]}</span></li>`;
+      }).join('')
+      : `<li class="roster-empty">${rosterState.filter === 'missing' && !rosterState.query ? 'Everyone on the roster has submitted. 🎉' : 'No students match.'}</li>`;
+
+    const unmatched = report.unmatched;
+    $('#rosterUnmatched').innerHTML = unmatched.length ? `
+      <details>
+        <summary>${unmatched.length} name${unmatched.length === 1 ? ' in submissions doesn’t' : 's in submissions don’t'} match the roster</summary>
+        <p>Usually a typo, a nickname or a student outside this class. Fix the name in the project (Edit) to link it.</p>
+        <ul>${unmatched.map((u) => `<li>${esc(u.name)} · team ${esc(u.team)}${u.reason === 'ambiguous' ? ' (matches more than one student)' : ''}</li>`).join('')}</ul>
+      </details>` : '';
+
+    $('#rosterMeta').innerHTML = `<span>Roster of ${roster.count} students${roster.source ? ` from ${esc(roster.source)}` : ''} · updated ${relTime(roster.updatedAt)}</span>
+      <button type="button" class="link-btn" data-roster="replace">Replace list</button>
+      <button type="button" class="link-btn" data-roster="remove">Remove roster</button>`;
+  }
+
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('Could not read the file.'));
+    reader.readAsDataURL(file);
+  });
+
+  async function previewRoster(body, source) {
+    try {
+      const parsed = await api('/api/admin/roster/preview', { method: 'POST', body });
+      rosterState.preview = { ...parsed, source };
+      renderRoster();
+    } catch (err) {
+      toast('Could not read the class list', err.message, 'error');
+    }
+  }
+
+  async function saveRoster(btn) {
+    const { students, source } = rosterState.preview;
+    setBusy(btn, true, 'Saving…');
+    try {
+      rosterState.data = await api('/api/admin/roster', { method: 'PUT', body: { students, source } });
+      rosterState.preview = null;
+      rosterState.replacing = false;
+      rosterState.filter = 'missing';
+      $('#rosterPaste').value = '';
+      renderRoster();
+      const { summary } = rosterState.data.report;
+      toast('Roster saved', `${summary.total} students · ${summary.missing} haven’t submitted yet.`, 'success');
+    } catch (err) {
+      toast('Could not save roster', err.message, 'error');
+      setBusy(btn, false);
+    }
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      const area = Object.assign(document.createElement('textarea'), { value: text });
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand('copy');
+      area.remove();
+      return ok;
+    }
+  }
+
+  async function copyMissing() {
+    const missing = rosterState.data.report.students.filter((s) => s.status === 'missing');
+    if (!missing.length) return toast('Nothing to copy', 'Everyone on the roster has submitted.', 'info');
+    const text = ['Roll Number\tStudent Name\tEmail', ...missing.map((s) => [s.rollNo, s.name, s.email].join('\t'))].join('\n');
+    if (await copyText(text)) toast('Copied', `${missing.length} students who haven’t submitted · paste into Excel or an email.`, 'success');
+    else toast('Copy failed', 'Your browser blocked clipboard access. Use Export CSV instead.', 'error');
+  }
+
+  function exportRoster() {
+    const cell = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [['Roll Number', 'Student Name', 'Email', 'Status', 'Team', 'Entered As']];
+    for (const s of rosterState.data.report.students) {
+      rows.push([s.rollNo, s.name, s.email, ROSTER_LABELS[s.status], s.matches.map((m) => m.team).join('; '), s.matches.map((m) => m.member).join('; ')]);
+    }
+    const blob = new Blob(['﻿' + rows.map((r) => r.map(cell).join(',')).join('\r\n')], { type: 'text/csv' });
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: `roster-submission-status-${new Date().toISOString().slice(0, 10)}.csv`,
+    });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  function rosterAction(action, btn) {
+    if (action === 'save') return saveRoster(btn);
+    if (action === 'discard') {
+      rosterState.preview = null;
+      return renderRoster();
+    }
+    if (action === 'replace') {
+      rosterState.replacing = true;
+      return renderRoster();
+    }
+    if (action === 'remove') {
+      return confirmAction({
+        title: 'Remove the class roster?',
+        text: 'The class list is deleted from the dashboard. Projects are not affected, and you can upload the list again any time.',
+        okLabel: 'Remove roster',
+        iconName: 'trash',
+        busyLabel: 'Removing…',
+        onConfirm: async () => {
+          await api('/api/admin/roster', { method: 'DELETE' });
+          rosterState.data = { roster: null, report: null };
+          renderRoster();
+          toast('Roster removed', '', 'success');
+        },
+      });
+    }
+    return undefined;
   }
 
   /* -------------------------------------------------------- security tab */
@@ -1806,6 +2021,44 @@
   });
 
   // Security tab. The fields live inside the settings form, so Enter must not submit it.
+  // Roster tab.
+  $('#rosterFile').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 1024 * 1024) return toast('File too large', 'The class list must be under 1 MB.', 'error');
+    await previewRoster({ fileName: file.name, base64: await fileToBase64(file) }, file.name);
+  });
+  const drop = $('#rosterDrop');
+  ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, () => drop.classList.add('over')));
+  ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, () => drop.classList.remove('over')));
+  $('#rosterUsePaste').addEventListener('click', () => {
+    const text = $('#rosterPaste').value;
+    if (!text.trim()) return toast('Nothing to use', 'Paste rows copied from Excel, or one name per line.', 'info');
+    return previewRoster({ text }, 'Pasted list');
+  });
+  $('#rosterCancelReplace').addEventListener('click', () => {
+    rosterState.replacing = false;
+    renderRoster();
+  });
+  $('#rosterCopy').addEventListener('click', copyMissing);
+  $('#rosterExport').addEventListener('click', exportRoster);
+  $('#rosterSearch').addEventListener('input', (e) => {
+    rosterState.query = e.target.value;
+    renderRosterReport();
+  });
+  $('#rosterSearch').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+  $('[data-panel="roster"]').addEventListener('click', (e) => {
+    const f = e.target.closest('[data-roster-filter]');
+    if (f) {
+      rosterState.filter = f.dataset.rosterFilter;
+      renderRosterReport();
+      return;
+    }
+    const a = e.target.closest('[data-roster]');
+    if (a) rosterAction(a.dataset.roster, a);
+  });
+
   $('#pwSave').addEventListener('click', changePassword);
   $('#pwNew').addEventListener('input', updatePasswordMeter);
   $$('.pw-form input').forEach((input) => input.addEventListener('keydown', (e) => {

@@ -78,6 +78,7 @@ After signing in, faculty get a **Control** button in the top bar. Every setting
 | Results | Publish or hide scores. While hidden, students see every project as Pending, a locked leaderboard and no class average; faculty views are unchanged |
 | Course | Course name (top bar, footer, page title), the homepage heading details (program, semester, batch) and an announcement banner shown to everyone |
 | Activity | Log of sign-ins, submissions, grades, edits, deletions and setting changes, kept for 180 days |
+| Roster | Upload the class list (.xlsx, .csv, or rows pasted from Excel; Roll Number / Email / Student Name columns are detected automatically) and see who has **not submitted**. Names are matched forgivingly: titles (Mr./Ms.), case, punctuation and one-letter typos are ignored, and partial names such as first + last name are flagged as **possible matches** for faculty to confirm. Copy the missing students or export everyone's status as CSV. Faculty-only; stored in the `roster` collection |
 | Security | Change the faculty password (current password required; at least 10 characters with letters and a number or symbol). Changing it signs out every other faculty session. Warns while the published default is still active |
 | Danger zone | CSV backup, sign out all faculty, clear all scores (type `RESET`), delete all projects (type `DELETE`) |
 
@@ -90,7 +91,13 @@ npm test                                          # against http://localhost:300
 BASE_URL=https://your-app.vercel.app npm test     # against a deployment
 ```
 
-This runs 57 end-to-end API checks covering the core API, both submission types and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`); after changing it in the Control Center, set `TEACHER_PASSWORD` to the new password when running the tests. Password changes only have their guards tested, so the suite never changes the real password. Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
+This runs 64 end-to-end API checks covering the core API, both submission types and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`); after changing it in the Control Center, set `TEACHER_PASSWORD` to the new password when running the tests. Password changes only have their guards tested, so the suite never changes the real password, and the roster upload flow only runs against localhost.
+
+Unit tests for roster parsing, name matching and the .xlsx reader use made-up names and need no server:
+
+```bash
+npm run test:unit
+``` Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
 
 ## How it works on serverless
 
@@ -118,5 +125,9 @@ This runs 57 end-to-end API checks covering the core API, both submission types 
 | `POST`   | `/api/admin/reset-scores` | faculty, body `{ "confirm": "RESET" }` |
 | `POST`   | `/api/admin/delete-all` | faculty, body `{ "confirm": "DELETE" }` |
 | `POST`   | `/api/admin/revoke-sessions` | faculty |
+| `GET`    | `/api/admin/roster` | faculty (roster + submission report) |
+| `POST`   | `/api/admin/roster/preview` | faculty, body `{ fileName, base64 }` or `{ text }`; parses without saving |
+| `PUT`    | `/api/admin/roster` | faculty, body `{ students: [{ name, rollNo, email }] }` |
+| `DELETE` | `/api/admin/roster` | faculty |
 
 `GET /api/projects` also returns the current `settings`, including a computed `accepting` flag.

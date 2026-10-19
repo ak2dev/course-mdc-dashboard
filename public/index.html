@@ -424,6 +424,7 @@
         <nav class="control-nav" id="controlNav" role="tablist" aria-label="Control Center sections">
           <button type="button" role="tab" data-tab="overview"><svg class="i"><use href="#i-grid" /></svg><span>Overview</span></button>
           <button type="button" role="tab" data-tab="submissions"><svg class="i"><use href="#i-calendar" /></svg><span>Submissions</span></button>
+          <button type="button" role="tab" data-tab="roster"><svg class="i"><use href="#i-users" /></svg><span>Roster</span></button>
           <button type="button" role="tab" data-tab="results"><svg class="i"><use href="#i-eye" /></svg><span>Results</span></button>
           <button type="button" role="tab" data-tab="course"><svg class="i"><use href="#i-megaphone" /></svg><span>Course</span></button>
           <button type="button" role="tab" data-tab="activity"><svg class="i"><use href="#i-activity" /></svg><span>Activity</span></button>
@@ -475,6 +476,47 @@
                 <p>Applies to student submissions. Faculty edits aren't limited.</p>
               </div>
               <div class="setting-control"><input type="number" name="maxTeamSize" min="1" max="20" step="1" aria-label="Maximum team size" /><span class="unit">members</span></div>
+            </div>
+          </section>
+
+          <section class="panel" data-panel="roster" role="tabpanel" hidden>
+            <div class="panel-head row">
+              <div>
+                <h3>Class roster</h3>
+                <p>Compare the class list with submissions to see who hasn’t submitted yet. Only faculty can see this.</p>
+              </div>
+              <div class="roster-tools" id="rosterTools" hidden>
+                <button type="button" class="btn btn-secondary btn-sm" id="rosterCopy"><svg class="i"><use href="#i-users" /></svg> Copy not submitted</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="rosterExport"><svg class="i"><use href="#i-download" /></svg> Export CSV</button>
+              </div>
+            </div>
+
+            <div id="rosterImport" hidden>
+              <label class="dropzone" id="rosterDrop">
+                <input type="file" id="rosterFile" accept=".xlsx,.csv,.tsv,.txt" />
+                <span class="dz-icon"><svg class="i"><use href="#i-download" /></svg></span>
+                <strong>Upload the class list</strong>
+                <small>.xlsx or .csv · columns like <em>Roll Number</em>, <em>Email</em>, <em>Student Name</em> are detected automatically</small>
+              </label>
+              <div class="or-divider"><span>or paste rows copied from Excel</span></div>
+              <textarea id="rosterPaste" rows="4" spellcheck="false" placeholder="Roll Number&#9;Email&#9;Student Name&#10;…"></textarea>
+              <div class="roster-paste-actions">
+                <button type="button" class="btn btn-secondary btn-sm" id="rosterUsePaste">Use pasted list</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="rosterCancelReplace" hidden>Cancel</button>
+              </div>
+            </div>
+
+            <div class="roster-preview" id="rosterPreview" hidden></div>
+
+            <div id="rosterReport" hidden>
+              <div class="roster-summary" id="rosterSummary" role="tablist" aria-label="Filter roster"></div>
+              <div class="roster-search">
+                <svg class="i"><use href="#i-search" /></svg>
+                <input type="search" id="rosterSearch" placeholder="Search name, roll number or email…" autocomplete="off" />
+              </div>
+              <ol class="roster-list" id="rosterList"></ol>
+              <div class="roster-unmatched" id="rosterUnmatched"></div>
+              <p class="roster-meta" id="rosterMeta"></p>
             </div>
           </section>
 
