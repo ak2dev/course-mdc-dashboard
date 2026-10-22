@@ -630,7 +630,9 @@
 
   function evalCell(p) {
     const inner = p.score === null
-      ? '<span class="awaiting">Awaiting review</span>'
+      ? isTeacher() && p.gradeLater
+        ? `<span class="awaiting later">Grade later${p.draftScore != null ? ` · draft ${fmtScore(p.draftScore)}` : ''}</span>`
+        : '<span class="awaiting">Awaiting review</span>'
       : `${badge(p.score)}<span class="score">${fmtScore(p.score)}</span>`;
     const evaluation = isTeacher()
       ? `<button type="button" class="eval" data-action="grade" data-id="${p.id}" title="Grade in preview">${inner}</button>`
@@ -1044,9 +1046,9 @@
     const btn = el.facultyBtn;
     btn.classList.toggle('btn-secondary', true);
     btn.classList.toggle('is-faculty', Boolean(token));
-    btn.title = token ? 'Faculty mode active — click to sign out' : 'Faculty sign in';
+    btn.title = token ? 'Faculty mode active' : 'Faculty sign in';
     btn.innerHTML = token
-      ? `<span class="dot"></span><span class="label">Faculty</span>${icon('logout')}`
+      ? `<span class="dot"></span><span class="label">Faculty</span>`
       : `${icon('lock')}<span class="label">Faculty</span>`;
     $('#footerFaculty').textContent = token ? 'Sign out' : 'Faculty access';
     if (!token && el.controlDialog.open) el.controlDialog.close();
@@ -1773,8 +1775,10 @@
     $('#deviceUrl').textContent = prettyUrl(linkOf(p));
 
     const t = tierOf(p.score);
+    const later = isTeacher() && p.score === null && p.gradeLater;
     $('#previewEval').innerHTML = `${ring(p.score, 60, 5)}<div class="sp-text">${badge(p.score)}<small>${
-      p.score === null ? 'Awaiting faculty review' : `${esc(t.range)} · ${esc(t.desc)}`}</small></div>`;
+      later ? `Saved to grade later${p.draftScore != null ? ` · draft ${fmtScore(p.draftScore)}` : ''}`
+        : p.score === null ? 'Awaiting faculty review' : `${esc(t.range)} · ${esc(t.desc)}`}</small></div>`;
 
     $('#previewMembers').innerHTML = p.members.map((m) => `<div class="member-row">${avatar(m)}<span>${esc(m)}</span></div>`).join('');
 
@@ -1788,9 +1792,10 @@
     if (p.gradedAt && isTeacher()) rows.push(['Last graded', esc(absTime(p.gradedAt))]);
     $('#previewDetails').innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
 
-    quickScore.set(p.score);
+    quickScore.set(p.score ?? p.draftScore ?? null);
     $('#qNotes').value = p.reviewerNotes || '';
     $('#qSaveNext').disabled = !nextPending(p.id);
+    $('#qSkip').hidden = p.score !== null;
     $('#previewNotesBlock').hidden = !p.reviewerNotes;
     $('#previewNotes').textContent = p.reviewerNotes || '';
   }
@@ -1856,14 +1861,55 @@
     if (!el.previewDialog.open) el.previewDialog.showModal();
   }
 
+  // Projects saved to grade later come up only once the untouched ones are done.
   function nextPending(currentId) {
     const list = state.projects;
     const start = list.findIndex((p) => p.id === currentId);
-    for (let i = 1; i < list.length; i++) {
-      const p = list[(start + i) % list.length];
-      if (p.score === null && linkOf(p) && p.id !== currentId) return p;
+    for (const later of [false, true]) {
+      for (let i = 1; i < list.length; i++) {
+        const p = list[(start + i) % list.length];
+        if (p.score === null && linkOf(p) && p.id !== currentId && Boolean(p.gradeLater) === later) return p;
+      }
     }
     return null;
+  }
+
+  async function saveForLater() {
+    const p = find(state.previewId);
+    if (!p) return;
+    const draftScore = quickScore.get();
+    if (draftScore === undefined) {
+      toast('Invalid score', 'Enter a score between 0.0 and 10.0, or leave it empty.', 'error');
+      quickScore.focus();
+      return;
+    }
+    const btn = $('#qSkip');
+    if (btn.disabled) return;
+    setBusy(btn, true, 'Saving…');
+    $('#qSave').disabled = true;
+    $('#qSaveNext').disabled = true;
+    try {
+      const { project } = await api(`/api/projects/${p.id}`, {
+        method: 'PATCH',
+        body: { draftScore, reviewerNotes: $('#qNotes').value, gradeLater: true },
+      });
+      Object.assign(p, project);
+      state.lastPayload = '';
+      render();
+      toast('Saved for later', `${p.teamName} stays pending. Come back to grade it anytime.`, 'success');
+      const next = nextPending(p.id);
+      if (next) openPreview(next.id);
+      else {
+        fillPreview(p);
+        toast('All caught up', 'There are no other pending projects with a deployment.', 'info');
+      }
+    } catch (err) {
+      toast('Could not save', err.message, 'error');
+      $('#qSaveNext').disabled = !nextPending(p.id);
+    } finally {
+      setBusy(btn, false);
+      $('#qSave').disabled = false;
+    }
   }
 
   async function saveQuickGrade(goNext) {
@@ -1944,7 +1990,8 @@
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
   });
 
-  el.facultyBtn.addEventListener('click', () => (isTeacher() ? logout() : openLogin()));
+  el.facultyBtn.addEventListener('click', () => { if (!isTeacher()) openLogin(); });
+  $('#signOutBtn').addEventListener('click', () => logout());
   $('#footerFaculty').addEventListener('click', () => (isTeacher() ? logout() : openLogin()));
   $('#previewLogin').addEventListener('click', () => openLogin());
   // Submit button opens a small menu: web project or desktop / mobile app.
@@ -2083,6 +2130,7 @@
   $$('[data-danger]').forEach((b) => b.addEventListener('click', () => dangerAction(b.dataset.danger)));
   $('#qSave').addEventListener('click', () => saveQuickGrade(false));
   $('#qSaveNext').addEventListener('click', () => saveQuickGrade(true));
+  $('#qSkip').addEventListener('click', () => saveForLater());
 
   $('#togglePw').addEventListener('click', () => {
     el.password.type = el.password.type === 'password' ? 'text' : 'password';
