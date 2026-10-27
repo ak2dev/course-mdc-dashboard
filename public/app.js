@@ -333,7 +333,16 @@
   // Course name, banner, status pills and submit button state.
   function renderChrome() {
     const s = state.settings;
-    $('#brandName').textContent = s.courseName;
+    // Mute the last word of the wordmark, like the hero title.
+    const words = s.courseName.trim().split(/\s+/);
+    const tail = words.length > 1 ? words.pop() : '';
+    $('#brandName').replaceChildren(words.join(' '));
+    if (tail) {
+      const muted = document.createElement('span');
+      muted.className = 'grad-text';
+      muted.textContent = tail;
+      $('#brandName').append(' ', muted);
+    }
     $('#footerName').textContent = s.courseName;
     $('#footerMark').textContent = s.courseName;
     $('#lede').textContent = `Submissions, live device previews and tiered evaluations for the ${s.courseName} cohort.`;
