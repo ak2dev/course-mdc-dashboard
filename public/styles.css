@@ -952,6 +952,8 @@ button.eval:hover { background: var(--surface-hover); }
 .field { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .field label, .score-inputs label { font-size: 13px; font-weight: 500; color: var(--text); }
 .field label em { color: var(--accent); font-style: normal; }
+.field label:has(.label-note) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.field label .label-note { color: var(--text-3); font-weight: 400; }
 .label-row { display: flex; align-items: center; justify-content: space-between; }
 .hint { font-size: 12px; color: var(--text-3); }
 

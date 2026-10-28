@@ -63,9 +63,9 @@ These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherw
 | Type | Showcase link | Stored as |
 | --- | --- | --- |
 | Web project | Live deployment URL, e.g. Vercel | `type: "web"`, `vercelUrl` |
-| Desktop / mobile app | Demo video on Google Drive (`drive.google.com` links only) | `type: "app"`, `demoUrl` |
+| Desktop / mobile app | Google Drive folder with the demo video, slides and other files (`drive.google.com` links only) | `type: "app"`, `demoUrl` |
 
-Faculty can watch a desktop / mobile app's demo inside the preview window while grading. This only works for links to a single file (`drive.google.com/file/d/…`) shared as "Anyone with the link"; folder links open in Google Drive instead. Projects submitted before types existed count as web projects. The CSV export includes "Project Type" and "Demo Video URL" columns.
+Faculty can browse a desktop / mobile app's Drive folder inside the preview window while grading. This works for folder links (`drive.google.com/drive/folders/…`) and single-file links shared as "Anyone with the link"; other Drive links open in Google Drive instead. Projects submitted before types existed count as web projects. The CSV export includes "Project Type" and "Drive Folder URL" columns.
 
 ## Control Center (faculty)
 

@@ -176,12 +176,23 @@
     }
   }
 
-  // Web projects showcase a live deployment; desktop / mobile apps a Drive demo video.
+  // Web projects showcase a live deployment; desktop / mobile apps a Google Drive folder.
   const isApp = (p) => p?.type === 'app';
   const linkOf = (p) => (isApp(p) ? p.demoUrl : p.vercelUrl) || '';
   const isDriveUrl = (value) => {
     try { return /^(drive|docs)\.google\.com$/i.test(new URL(value).hostname); } catch { return false; }
   };
+
+  // Folder ID from /drive/folders/<id> (or /drive/u/0/folders/<id>) links.
+  function driveFolderId(value) {
+    try {
+      if (!isDriveUrl(value)) return null;
+      const id = new URL(value).pathname.match(/\/folders\/([\w-]{10,})/)?.[1];
+      return id || null;
+    } catch {
+      return null;
+    }
+  }
 
   // File ID from /file/d/<id>/… or ?id=<id> links; folders and other links return null.
   function driveFileId(value) {
@@ -196,7 +207,7 @@
   }
 
   const typeTag = (p) => isApp(p)
-    ? `<span class="type-tag app" title="Desktop / mobile app · demo video">${icon('video')}App</span>`
+    ? `<span class="type-tag app" title="Desktop / mobile app · Google Drive folder">${icon('video')}App</span>`
     : `<span class="type-tag" title="Web project · live deployment">${icon('globe')}Web</span>`;
 
   const find = (id) => state.projects.find((p) => p.id === id);
@@ -593,10 +604,10 @@
 
   function deployLink(p) {
     if (isApp(p)) {
-      if (!p.demoUrl) return '<span class="not-provided">No demo video</span>';
+      if (!p.demoUrl) return '<span class="not-provided">No Drive folder</span>';
       return `<div class="link-group">
-        <a class="link-pill demo" href="${esc(p.demoUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.demoUrl)}">${icon('play')}<span>Demo video</span></a>
-        <button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="Watch demo here" aria-label="Watch ${esc(p.teamName)} demo">${icon('eye')}</button>
+        <a class="link-pill demo" href="${esc(p.demoUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.demoUrl)}">${icon('folder')}<span>Drive folder</span></a>
+        <button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="Open files here" aria-label="Open ${esc(p.teamName)} files">${icon('eye')}</button>
       </div>`;
     }
     if (!p.vercelUrl) return '<span class="not-provided">Not submitted</span>';
@@ -723,8 +734,8 @@
             ${memberChips(p.members)}
           </div>
           <div class="p-card-foot">
-            <button type="button" class="btn btn-secondary btn-sm" data-action="preview" data-id="${p.id}" ${linkOf(p) ? '' : 'disabled'}>${icon(isApp(p) ? 'play' : 'eye')} ${isApp(p) ? 'Watch demo' : 'Preview'}</button>
-            ${linkOf(p) ? `<a class="icon-btn sm" href="${esc(linkOf(p))}" target="_blank" rel="noopener noreferrer" title="${isApp(p) ? 'Open demo video in Google Drive' : 'Open live site'}">${icon('external')}</a>` : ''}
+            <button type="button" class="btn btn-secondary btn-sm" data-action="preview" data-id="${p.id}" ${linkOf(p) ? '' : 'disabled'}>${icon(isApp(p) ? 'folder' : 'eye')} ${isApp(p) ? 'View files' : 'Preview'}</button>
+            ${linkOf(p) ? `<a class="icon-btn sm" href="${esc(linkOf(p))}" target="_blank" rel="noopener noreferrer" title="${isApp(p) ? 'Open folder in Google Drive' : 'Open live site'}">${icon('external')}</a>` : ''}
             ${p.githubUrl ? `<a class="icon-btn sm" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="Open repository">${icon('github')}</a>` : ''}
             <span class="spacer"></span>
             <span class="teacher-only">${teacherActions(p)}</span>
@@ -784,7 +795,7 @@
         <div class="rank-project">${badge(p.score)}</div>
         <div class="score-bar tier-${t.key}"><span class="bar"><i style="width:${p.score * 10}%"></i></span><span class="score">${fmtScore(p.score)}</span></div>
         <div class="rank-links">
-          ${linkOf(p) ? `<button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="${isApp(p) ? 'Watch demo' : 'Preview'}">${icon(isApp(p) ? 'play' : 'eye')}</button>` : ''}
+          ${linkOf(p) ? `<button type="button" class="icon-btn sm" data-action="preview" data-id="${p.id}" title="${isApp(p) ? 'View files' : 'Preview'}">${icon(isApp(p) ? 'folder' : 'eye')}</button>` : ''}
           ${p.githubUrl ? `<a class="icon-btn sm" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="Repository">${icon('github')}</a>` : ''}
         </div>
       </div>`;
@@ -1010,7 +1021,7 @@
     if (!payload.members.length) flag($('#fMemberInput'), 'Add at least one team member.');
     if (payload.vercelUrl && !validUrl(payload.vercelUrl)) flag(f.vercelUrl, 'Deployment URL is not valid.');
     if (payload.demoUrl && !(validUrl(payload.demoUrl) && isDriveUrl(payload.demoUrl))) {
-      flag(f.demoUrl, 'Demo video must be a Google Drive link (drive.google.com).');
+      flag(f.demoUrl, 'Drive folder must be a Google Drive link (drive.google.com).');
     }
     if (payload.githubUrl && !validUrl(payload.githubUrl, { github: true })) flag(f.githubUrl, 'Repository link must be a github.com URL.');
 
@@ -1794,7 +1805,7 @@
     const rows = [
       ['Submitted', esc(absTime(p.createdAt))],
       ['Tech stack', esc(p.techStack || '—')],
-      [isApp(p) ? 'Demo video' : 'Live site',
+      [isApp(p) ? 'Drive folder' : 'Live site',
         `<a href="${esc(linkOf(p))}" target="_blank" rel="noopener noreferrer">${isApp(p) ? 'Open in Google Drive' : esc(prettyUrl(linkOf(p)))}</a>`],
       ['Repository', p.githubUrl ? `<a href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer">${esc(repoPath(p.githubUrl))}</a>` : '—'],
     ];
@@ -1820,20 +1831,23 @@
     const app = isApp(p);
     const token = ++frameToken;
     el.frameLoading.classList.remove('done');
-    $('#frameLoadingText').textContent = app ? 'Loading demo video…' : 'Loading deployment…';
+    $('#frameLoadingText').textContent = app ? 'Loading Drive folder…' : 'Loading deployment…';
     el.frameBlocked.hidden = true;
     el.frame.src = 'about:blank';
 
-    // Drive's /preview player is embeddable; folder links and other Drive URLs are not.
+    // Drive folders embed through embeddedfolderview, single files through /preview;
+    // other Drive URLs (Docs editors, shared drives) can't be embedded.
     let url = linkOf(p);
     if (app) {
-      const id = driveFileId(url);
-      if (!id) {
-        showFrameBlocked('This Drive link can’t be played here',
-          'Only links to a single video file (drive.google.com/file/d/…) can be embedded. Open it in Google Drive instead.');
+      const folderId = driveFolderId(url);
+      const fileId = folderId ? null : driveFileId(url);
+      if (folderId) url = `https://drive.google.com/embeddedfolderview?id=${encodeURIComponent(folderId)}#grid`;
+      else if (fileId) url = `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/preview`;
+      else {
+        showFrameBlocked('This Drive link can’t be shown here',
+          'Only folder links (drive.google.com/drive/folders/…) and single-file links can be embedded. Open it in Google Drive instead.');
         return;
       }
-      url = `https://drive.google.com/file/d/${encodeURIComponent(id)}/preview`;
     }
     setTimeout(() => { if (token === frameToken) el.frame.src = url; }, 0);
 
@@ -1857,8 +1871,8 @@
     const p = find(id);
     if (!p) return;
     if (!linkOf(p)) {
-      toast(isApp(p) ? 'No demo video' : 'No live deployment',
-        `${p.teamName} hasn't submitted ${isApp(p) ? 'a demo video link' : 'a deployment URL'} yet.`, 'info');
+      toast(isApp(p) ? 'No Drive folder' : 'No live deployment',
+        `${p.teamName} hasn't submitted ${isApp(p) ? 'a Google Drive folder link' : 'a deployment URL'} yet.`, 'info');
       if (isTeacher()) openSubmit(p);
       return;
     }
