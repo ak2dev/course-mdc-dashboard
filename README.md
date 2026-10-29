@@ -8,12 +8,15 @@ Static vanilla JS/CSS frontend (`public/`) plus a single Node API function (`api
 
 ```
 api/index.js     Vercel serverless entry; all /api/* requests are rewritten here
-lib/app.js       API routes, validation, auth, CSV export, embed check
+lib/app.js       API routes, validation, auth, embed check
+lib/export.js    Faculty exports: PDF / HTML report, Excel, CSV, JSON
+lib/xlsx.js      Dependency-free .xlsx reader (roster) and writer (export)
 lib/store.js     Storage: MongoDB when MONGODB_URI is set, else data/projects.json
 public/          Frontend (served as static files)
 server.js        Local dev server (static files + the same API handler)
 scripts/seed.js  Seed, reset or import data
 tests/smoke.js   End-to-end API tests (npm test)
+tests/*.test.js  Unit tests (npm run test:unit)
 vercel.json      Output dir, bom1 region, /api rewrite, security headers
 ```
 
@@ -67,6 +70,20 @@ These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherw
 
 Faculty can browse a desktop / mobile app's Drive folder inside the preview window while grading. This works for folder links (`drive.google.com/drive/folders/…`) and single-file links shared as "Anyone with the link"; other Drive links open in Google Drive instead. Projects submitted before types existed count as web projects. The CSV export includes "Project Type" and "Drive Folder URL" columns.
 
+## Exports (faculty)
+
+**Export** (hero, footer and Danger zone) opens a dialog with five formats. Every export includes scores, tiers, ranks and reviewer notes, so it is faculty-only.
+
+| Format | What you get |
+| --- | --- |
+| PDF report | The report below, opened in the browser's print dialog: choose **Save as PDF**. A4 landscape, themed background on every page |
+| Web report (.html) | A self-contained page: course header, cohort card, stats strip, tier distribution, top-three podium and every team with links and feedback |
+| Excel workbook (.xlsx) | *Overview*, *Submissions* (filterable, frozen header, clickable links, real dates and scores) and *Leaderboard* sheets |
+| CSV | The same columns as before, for Google Sheets or any tool |
+| JSON backup | Full raw data with summary and scope, for scripts and archives |
+
+The PDF, web report and workbook use the dashboard's design (Geist type, grayscale tier ramp, inverted Excellent badge) in a **Light** or **Dark** theme; the dialog defaults to the theme you're using. **Current view** exports only the teams matching the dashboard's tier filter and search. Dates use the exporter's local time zone.
+
 ## Control Center (faculty)
 
 After signing in, faculty get a **Control** button in the top bar. Every setting is enforced by the API, not just hidden in the page.
@@ -80,7 +97,7 @@ After signing in, faculty get a **Control** button in the top bar. Every setting
 | Activity | Log of sign-ins, submissions, grades, edits, deletions and setting changes, kept for 180 days |
 | Roster | Upload the class list (.xlsx, .csv, or rows pasted from Excel; Roll Number / Email / Student Name columns are detected automatically) and see who has **not submitted**. Names are matched forgivingly: titles (Mr./Ms.), case, punctuation and one-letter typos are ignored, and partial names such as first + last name are flagged as **possible matches** for faculty to confirm. Copy the missing students or export everyone's status as CSV. Faculty-only; stored in the `roster` collection |
 | Security | Change the faculty password (current password required; at least 10 characters with letters and a number or symbol). Changing it signs out every other faculty session. Warns while the published default is still active |
-| Danger zone | CSV backup, sign out all faculty, clear all scores (type `RESET`), delete all projects (type `DELETE`) |
+| Danger zone | Export backup, sign out all faculty, clear all scores (type `RESET`), delete all projects (type `DELETE`) |
 
 Faculty can still add or edit teams while submissions are closed, and their edits aren't limited by team size or capacity. Settings live in the `settings` collection and the log in `activity`.
 
@@ -116,7 +133,7 @@ npm run test:unit
 | `POST`   | `/api/projects`         | public  |
 | `PATCH`  | `/api/projects/:id`     | faculty |
 | `DELETE` | `/api/projects/:id`     | faculty |
-| `GET`    | `/api/export/csv`       | faculty |
+| `GET`    | `/api/export/:format`   | faculty · `csv`, `json`, `xlsx`, `html`, `print` (report HTML for printing to PDF); query `theme=light\|dark`, `tier`, `q`, `tz` (minutes east of UTC) |
 | `POST`   | `/api/auth/login`       | body `{ "password": "…" }` |
 | `POST`   | `/api/auth/logout`      | faculty |
 | `GET`    | `/api/frame-check?url=` | public  |

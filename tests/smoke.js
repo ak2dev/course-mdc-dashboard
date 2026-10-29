@@ -106,6 +106,11 @@ async function coreSuite() {
   check('CSV export', csv.status === 200 && String(csv.data).includes(`Test Core ${stamp}`));
   check('CSV includes project type + demo video columns',
     /Project Type/.test(String(csv.data)) && String(csv.data).includes('Desktop / mobile app') && String(csv.data).includes('drive.google.com/file/d/1AbCdEfGhIjKlMnOpQr'));
+  for (const format of ['json', 'xlsx', 'html', 'print']) {
+    const out = await call('GET', `/api/export/${format}?theme=dark&q=${encodeURIComponent(stamp)}`, { token });
+    check(`${format} export`, out.status === 200 && (format === 'xlsx' || JSON.stringify(out.data).includes(stamp)));
+  }
+  check('unknown export format -> 404', (await call('GET', '/api/export/pptx', { token })).status === 404);
   check('delete desktop/mobile app', (await call('DELETE', `/api/projects/${appId}`, { token })).status === 200);
 
   const fc = await call('GET', `/api/frame-check?url=${encodeURIComponent('https://github.com')}`);

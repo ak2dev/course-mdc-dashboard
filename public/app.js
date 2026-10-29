@@ -1124,27 +1124,140 @@
 
   /* =============================================================== export */
 
-  async function exportCsv() {
-    if (!isTeacher()) return openLogin(exportCsv);
+  // PDF, web report and workbook follow the chosen light / dark theme.
+  const EXPORT_FORMATS = {
+    pdf: { action: 'Save as PDF', themed: true },
+    html: { action: 'Download report', themed: true },
+    xlsx: { action: 'Download workbook', themed: true },
+    csv: { action: 'Download CSV', themed: false },
+    json: { action: 'Download backup', themed: false },
+  };
+  const exportState = { format: 'pdf', theme: null, scope: 'all' };
+  try {
+    const saved = JSON.parse(store.get('mdc-export') || '{}');
+    if (EXPORT_FORMATS[saved.format]) exportState.format = saved.format;
+    if (['light', 'dark'].includes(saved.theme)) exportState.theme = saved.theme;
+  } catch { /* ignore a damaged preference */ }
+
+  const viewFiltered = () => state.filter !== 'all' || Boolean(state.query.trim());
+  const exportList = () => (exportState.scope === 'view' ? visibleProjects() : state.projects);
+
+  function openExport(format) {
+    if (!isTeacher()) return openLogin(() => openExport(format));
+    if (EXPORT_FORMATS[format]) exportState.format = format;
+    exportState.theme ||= document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    exportState.scope = viewFiltered() ? 'view' : 'all';
+    $('#exportForm').elements.format.value = exportState.format;
+    renderExport();
+    $('#exportDialog').showModal();
+  }
+
+  function renderExport() {
+    const fmt = EXPORT_FORMATS[exportState.format];
+    const filtered = viewFiltered();
+    if (!filtered) exportState.scope = 'all';
+    const pick = (root, value) => $$('button', root).forEach((b) => {
+      const on = b.dataset.value === value;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+    $('#exportThemeRow').hidden = !fmt.themed;
+    pick($('#exportTheme'), exportState.theme);
+    pick($('#exportScope'), exportState.scope);
+    const viewBtn = $('#exportScope [data-value="view"]');
+    viewBtn.disabled = !filtered;
+    viewBtn.title = filtered ? 'Only the teams matching the current tier filter and search' : 'Filter or search the dashboard to export a subset';
+    $('#exportAllCount').textContent = state.projects.length;
+    $('#exportViewCount').textContent = filtered ? visibleProjects().length : '—';
+
+    $('#exportHint').innerHTML = exportState.format === 'pdf'
+      ? `${icon('info')}<span>Your browser’s print dialog opens with the report. Choose <strong>Save as PDF</strong> as the destination.</span>`
+      : '';
+    const list = exportList();
+    const graded = list.filter((p) => p.score !== null && p.score !== undefined).length;
+    $('#exportNote').innerHTML = `${icon('layers')}<span>${list.length} team${list.length === 1 ? '' : 's'} · ${graded} graded${
+      exportState.scope === 'view' ? ' · filtered view' : ''}</span>`;
+    $('#exportGo .btn-label').textContent = fmt.action;
+  }
+
+  function exportParams() {
+    const params = new URLSearchParams({ tz: String(-new Date().getTimezoneOffset()) });
+    if (EXPORT_FORMATS[exportState.format].themed) params.set('theme', exportState.theme);
+    if (exportState.scope === 'view') {
+      if (state.filter !== 'all') params.set('tier', state.filter);
+      if (state.query.trim()) params.set('q', state.query.trim());
+    }
+    return params;
+  }
+
+  function saveBlob(blob, name) {
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // Prints the themed report from an off-screen frame; the browser saves it as PDF.
+  function printReport(html, name) {
+    return new Promise((resolve) => {
+      const frame = Object.assign(document.createElement('iframe'), { className: 'print-frame', title: 'Report for printing' });
+      frame.setAttribute('aria-hidden', 'true');
+      frame.addEventListener('load', async () => {
+        const win = frame.contentWindow;
+        try { await win.document.fonts.ready; } catch { /* print with fallback fonts */ }
+        // Browsers name the PDF after the page title.
+        const pageTitle = document.title;
+        const base = name.replace(/\.pdf$/, '');
+        document.title = base;
+        win.document.title = base;
+        const done = () => {
+          document.title = pageTitle;
+          frame.remove();
+          resolve();
+        };
+        win.addEventListener('afterprint', () => setTimeout(done, 100), { once: true });
+        win.focus();
+        win.print();
+      }, { once: true });
+      frame.srcdoc = html;
+      document.body.appendChild(frame);
+    });
+  }
+
+  async function runExport(e) {
+    e.preventDefault();
+    const format = exportState.format;
+    const btn = $('#exportGo');
+    const count = exportList().length;
+    store.set('mdc-export', JSON.stringify({ format, theme: exportState.theme }));
+    setBusy(btn, true, format === 'pdf' ? 'Preparing…' : 'Exporting…');
     try {
-      const res = await fetch('/api/export/csv', { headers: { 'x-teacher-token': state.token } });
+      const res = await fetch(`/api/export/${format === 'pdf' ? 'print' : format}?${exportParams()}`, {
+        headers: { 'x-teacher-token': state.token },
+      });
       if (res.status === 401) {
+        $('#exportDialog').close();
         setToken(null, { reload: false });
-        return openLogin(exportCsv);
+        return openLogin(() => openExport(format));
       }
       if (!res.ok) throw new Error(`Export failed (${res.status}).`);
-      const blob = await res.blob();
-      const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || 'course-mdc-grades.csv';
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-      toast('Export ready', `${name} downloaded with ${state.projects.length} team${state.projects.length === 1 ? '' : 's'}.`, 'success');
+      const teams = `${count} team${count === 1 ? '' : 's'}`;
+      if (format === 'pdf') {
+        const html = await res.text();
+        $('#exportDialog').close();
+        await printReport(html, res.headers.get('x-export-filename') || 'course-report.pdf');
+        toast('Report sent to print', `Choose “Save as PDF” to keep a copy · ${teams}.`, 'success');
+      } else {
+        const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '')?.[1] || `course-export.${format}`;
+        saveBlob(await res.blob(), name);
+        $('#exportDialog').close();
+        toast('Export ready', `${name} downloaded with ${teams}.`, 'success');
+      }
     } catch (err) {
       toast('Export failed', err.message, 'error');
+    } finally {
+      setBusy(btn, false);
     }
   }
 
@@ -2059,7 +2172,25 @@
     if (e.target.name === 'type') applyFormType(e.target.value);
   });
   $$('[data-open="rubric"]').forEach((b) => b.addEventListener('click', () => el.rubricDialog.showModal()));
-  $$('[data-export]').forEach((b) => b.addEventListener('click', exportCsv));
+  $$('[data-export]').forEach((b) => b.addEventListener('click', () => openExport(b.dataset.export)));
+  $('#exportForm').addEventListener('submit', runExport);
+  $('#exportForm').addEventListener('change', (e) => {
+    if (e.target.name !== 'format') return;
+    exportState.format = e.target.value;
+    renderExport();
+  });
+  $('#exportTheme').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    exportState.theme = b.dataset.value;
+    renderExport();
+  });
+  $('#exportScope').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    exportState.scope = b.dataset.value;
+    renderExport();
+  });
 
   el.submitForm.addEventListener('submit', onSubmit);
   el.loginForm.addEventListener('submit', onLogin);
