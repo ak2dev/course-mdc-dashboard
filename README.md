@@ -68,21 +68,30 @@ These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherw
 | Web project | Live deployment URL, e.g. Vercel | `type: "web"`, `vercelUrl` |
 | Desktop / mobile app | Google Drive folder with the demo video, slides and other files (`drive.google.com` links only) | `type: "app"`, `demoUrl` |
 
-Faculty can browse a desktop / mobile app's Drive folder inside the preview window while grading. This works for folder links (`drive.google.com/drive/folders/…`) and single-file links shared as "Anyone with the link"; other Drive links open in Google Drive instead. Projects submitted before types existed count as web projects. The CSV export includes "Project Type" and "Drive Folder URL" columns.
+Faculty can browse a desktop / mobile app's Drive folder inside the preview window while grading. This works for folder links (`drive.google.com/drive/folders/…`) and single-file links shared as "Anyone with the link"; other Drive links open in Google Drive instead. Projects submitted before types existed count as web projects. Every export records each project's type and its Drive folder link.
 
 ## Exports (faculty)
 
-**Export** (hero, footer and Danger zone) opens a dialog with five formats. Every export includes scores, tiers, ranks and reviewer notes, so it is faculty-only.
+The **Export** button (hero and footer) opens a dialog with five formats. Exports always include scores, tiers, ranks and reviewer notes, even while results are hidden from students, so only signed-in faculty can export; anyone else is asked to sign in first. The Danger zone's **Export** button opens the same dialog with JSON selected, for a backup before bulk actions.
 
-| Format | What you get |
-| --- | --- |
-| PDF report | The report below, opened in the browser's print dialog: choose **Save as PDF**. A4 landscape, themed background on every page |
-| Web report (.html) | A self-contained page: course header, cohort card, stats strip, tier distribution, top-three podium and every team with links and feedback |
-| Excel workbook (.xlsx) | *Overview*, *Submissions* (filterable, frozen header, clickable links, real dates and scores) and *Leaderboard* sheets |
-| CSV | The same columns as before, for Google Sheets or any tool |
-| JSON backup | Full raw data with summary and scope, for scripts and archives |
+| Format | File | What you get |
+| --- | --- | --- |
+| PDF report | `<course>-report-<date>.pdf` | The report described below, opened in the browser's print dialog. Choose **Save as PDF** as the destination. A4 landscape, with the theme's background on every page and the table header repeated across pages |
+| Web report | `<course>-report-<date>.html` | The same report as one self-contained page to share or archive. It needs no server, loads the Geist fonts from Google Fonts and adapts to phone screens |
+| Excel workbook | `<course>-grades-<date>.xlsx` | Three sheets. **Overview**: course details, the four stats and the tier distribution. **Submissions**: one row per team with a frozen, filterable header, clickable links, numeric scores and real dates. **Leaderboard**: graded teams by rank |
+| CSV | `<course>-grades-<date>.csv` | One row per team with the original columns (type, links, score, tier, status, notes, timestamps), for Google Sheets or any tool |
+| JSON backup | `<course>-backup-<date>.json` | The complete data: course details, summary stats, export scope and every project with its rank, tier and grading state |
 
-The PDF, web report and workbook use the dashboard's design (Geist type, grayscale tier ramp, inverted Excellent badge) in a **Light** or **Dark** theme; the dialog defaults to the theme you're using. **Current view** exports only the teams matching the dashboard's tier filter and search. Dates use the exporter's local time zone.
+`<course>` is the course name from Control Center → Course, and `<date>` is the export day in your time zone. Filtered exports add `-filtered` to the name.
+
+**The report** (PDF and web) mirrors the dashboard: the course wordmark and program pill, an inverted cohort card, the stats strip (teams, graded, pending, class average), a tier distribution bar with counts, a top-three podium with score rings, and every team with member avatars, project type, live site / Drive and GitHub links, score, tier badge, rank and reviewer notes.
+
+**Dialog options**
+
+- **Theme**: Light or Dark, defaulting to the theme you're using. It applies to the PDF, web report and workbook; CSV and JSON have no styling.
+- **Teams**: *All teams*, or *Current view* to export only the teams matching the dashboard's tier filter and search. *Current view* is available when a filter or search is active, and the dialog shows how many teams each choice includes.
+
+The dialog remembers your last format and theme in this browser. Dates are written in your local time zone. The workbook asks Excel for the Geist font and falls back to a standard sans-serif on computers without it; colours and layout stay the same. Ranks match the leaderboard: tied scores share a rank.
 
 ## Control Center (faculty)
 
@@ -108,13 +117,15 @@ npm test                                          # against http://localhost:300
 BASE_URL=https://your-app.vercel.app npm test     # against a deployment
 ```
 
-This runs 64 end-to-end API checks covering the core API, both submission types and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`); after changing it in the Control Center, set `TEACHER_PASSWORD` to the new password when running the tests. Password changes only have their guards tested, so the suite never changes the real password, and the roster upload flow only runs against localhost.
+This runs the end-to-end API checks covering the core API, both submission types, every export format and the Control Center. The faculty password comes from `TEACHER_PASSWORD` (environment variable or `.env.local`); after changing it in the Control Center, set `TEACHER_PASSWORD` to the new password when running the tests. Password changes only have their guards tested, so the suite never changes the real password, and the roster upload flow only runs against localhost.
 
-Unit tests for roster parsing, name matching and the .xlsx reader use made-up names and need no server:
+Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost. The suite signs in several times, so wait a minute before signing in from the browser if you hit the sign-in rate limit.
+
+Unit tests cover roster parsing, name matching, the .xlsx reader and writer, and every export format (columns, filtering, ranks, time zones, HTML escaping). They use made-up names and need no server:
 
 ```bash
 npm run test:unit
-``` Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost.
+```
 
 ## How it works on serverless
 
@@ -122,7 +133,7 @@ npm run test:unit
 - **Faculty password** set in the Control Center is stored as a salted scrypt hash in the `credentials` collection and never returned by the API. Forgot it? Run `npm run reset-password` with `MONGODB_URI` in `.env.local`, then sign in with `TEACHER_PASSWORD` or the default and set a new one.
 - **Sign-in rate limiting** allows 8 attempts per minute per IP address (password-change attempts count too), tracked in the `login_attempts` collection, which also expires old entries.
 - **Student submissions** need no login and always start as *Pending*.
-- **Reviewer notes** are feedback for the team. They appear on the dashboard (a **Feedback** button in the table, an excerpt on Showcase cards and the preview panel) once the project is graded and results are published; until then only faculty can see them.
+- **Reviewer notes** are feedback for the team. They appear on the dashboard (a feedback icon beside the score in the table, an excerpt on Showcase cards and the preview panel) once the project is graded and results are published; until then only faculty can see them.
 
 ## API
 
@@ -133,18 +144,30 @@ npm run test:unit
 | `POST`   | `/api/projects`         | public  |
 | `PATCH`  | `/api/projects/:id`     | faculty |
 | `DELETE` | `/api/projects/:id`     | faculty |
-| `GET`    | `/api/export/:format`   | faculty · `csv`, `json`, `xlsx`, `html`, `print` (report HTML for printing to PDF); query `theme=light\|dark`, `tier`, `q`, `tz` (minutes east of UTC) |
+| `GET`    | `/api/export/:format`   | faculty; see below |
 | `POST`   | `/api/auth/login`       | body `{ "password": "…" }` |
 | `POST`   | `/api/auth/logout`      | faculty |
+| `GET`    | `/api/auth/session`     | public (returns `{ authenticated }` for the sent token) |
 | `GET`    | `/api/frame-check?url=` | public  |
 | `PATCH`  | `/api/admin/settings`   | faculty |
 | `GET`    | `/api/admin/activity?limit=` | faculty |
 | `POST`   | `/api/admin/reset-scores` | faculty, body `{ "confirm": "RESET" }` |
 | `POST`   | `/api/admin/delete-all` | faculty, body `{ "confirm": "DELETE" }` |
 | `POST`   | `/api/admin/revoke-sessions` | faculty |
+| `GET`    | `/api/admin/security`   | faculty (whether a custom password is set and when it changed) |
+| `POST`   | `/api/admin/password`   | faculty, body `{ currentPassword, newPassword }`; returns a new token and signs out other sessions |
 | `GET`    | `/api/admin/roster` | faculty (roster + submission report) |
 | `POST`   | `/api/admin/roster/preview` | faculty, body `{ fileName, base64 }` or `{ text }`; parses without saving |
 | `PUT`    | `/api/admin/roster` | faculty, body `{ students: [{ name, rollNo, email }] }` |
 | `DELETE` | `/api/admin/roster` | faculty |
 
 `GET /api/projects` also returns the current `settings`, including a computed `accepting` flag.
+
+`GET /api/export/:format` takes `csv`, `json`, `xlsx`, `html` or `print`. `print` returns the report HTML without a download header (the dashboard prints it to PDF) and names the PDF in an `X-Export-Filename` header. Optional query parameters:
+
+| Parameter | Values | Default |
+| --- | --- | --- |
+| `theme` | `light` or `dark` (report and workbook only) | `light` |
+| `tier` | `excellent`, `verygood`, `good`, `acceptable`, `improve` or `pending` | every tier |
+| `q` | Search text matched against team, title, tech stack and member names, as on the dashboard | none |
+| `tz` | Minutes east of UTC for dates and file names, e.g. `330` for India | `0` |
