@@ -41,7 +41,10 @@
     capacity: 64,
     token: null, // kept in memory only
     loaded: false,
-    view: ['table', 'grid', 'leaderboard'].includes(store.get('mdc-view')) ? store.get('mdc-view') : 'table',
+    // Phones start on the card layout; a view the user picked is always remembered.
+    view: ['table', 'grid', 'leaderboard'].includes(store.get('mdc-view'))
+      ? store.get('mdc-view')
+      : window.matchMedia('(max-width: 760px)').matches ? 'grid' : 'table',
     filter: 'all',
     query: '',
     device: DEVICES[store.get('mdc-device')] ? store.get('mdc-device') : 'desktop',
@@ -293,7 +296,7 @@
       applySettings(data.settings);
       state.projects = data.projects.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       state.loaded = true;
-      if (changed) render();
+      if (changed) render({ calm: silent });
     } catch (err) {
       if (!silent) toast('Could not load projects', err.message, 'error');
       if (!state.loaded) {
@@ -442,11 +445,12 @@
 
   /* =============================================================== render */
 
-  function render() {
+  // `calm` is for background refreshes: content updates in place without replaying entrance animations.
+  function render({ calm = false } = {}) {
     renderChrome();
     renderStats();
     renderChips();
-    renderView();
+    renderView({ calm });
   }
 
   // Numbers render as data-count targets; the first render animates them up from zero.
@@ -506,7 +510,7 @@
 
     renderCohort(s, intro);
     el.stats.innerHTML = [
-      stat('Teams', 'layers', counter(s.teams), `<strong>${s.avgTeam ? s.avgTeam.toFixed(1) : '0'}</strong> members per team`),
+      stat('Teams', 'layers', counter(s.teams), s.teams ? `<strong>${s.avgTeam.toFixed(1)}</strong> members per team` : 'no submissions yet'),
       hidden
         ? stat('Graded', 'check', '—', 'shown when results are published')
         : stat('Graded', 'check', `${counter(s.graded)}<small>/ ${s.teams}</small>`, `${s.teams ? Math.round((s.graded / s.teams) * 100) : 0}% evaluated`),
@@ -557,13 +561,16 @@
         : `<span><strong>${total}</strong> team${total === 1 ? '' : 's'} · <strong>${computeStats().students}</strong> students</span>`;
   }
 
-  function renderView() {
+  function renderView({ calm = false } = {}) {
     $$('#viewSwitch button').forEach((b) => {
       const on = b.dataset.view === state.view;
       b.classList.toggle('active', on);
       b.setAttribute('aria-selected', on);
     });
     renderSectionMeta();
+    el.view.classList.toggle('calm', calm);
+    // Re-rendering the table keeps its sideways scroll position.
+    const scrollLeft = $('.table-scroll', el.view)?.scrollLeft || 0;
 
     if (!state.loaded) {
       el.view.innerHTML = `<div class="card">${Array.from({ length: 6 }, () =>
@@ -571,9 +578,11 @@
       return;
     }
     if (!state.projects.length) {
-      el.view.innerHTML = emptyState('inbox', 'No submissions yet',
-        'Be the first team to share your work. Your project will appear here instantly, marked as pending review.',
-        `<button class="btn btn-primary" data-action="submit" type="button">${icon('plus')} Submit a project</button>`);
+      el.view.innerHTML = isTeacher() || isAccepting()
+        ? emptyState('inbox', 'No submissions yet',
+          'Be the first team to share your work. Your project will appear here instantly, marked as pending review.',
+          `<button class="btn btn-primary" data-action="submit" type="button">${icon('plus')} Submit a project</button>`)
+        : emptyState('lock', 'No submissions yet', 'Submissions are closed right now. Projects will appear here once faculty reopen them.');
       return;
     }
 
@@ -587,7 +596,7 @@
       return;
     }
     if (state.view === 'grid') renderGrid(list);
-    else renderTable(list);
+    else renderTable(list, scrollLeft);
   }
 
   function emptyState(ico, title, text, action = '') {
@@ -619,18 +628,23 @@
 
   function repoLink(p) {
     if (!p.githubUrl) return '<span class="not-provided">Not submitted</span>';
-    return `<a class="link-pill" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.githubUrl)}">${icon('github')}<span>${esc(repoPath(p.githubUrl))}</span></a>`;
+    // The owner is wrapped separately so narrow tables can show just the repo name.
+    const path = repoPath(p.githubUrl);
+    const cut = path.indexOf('/') + 1;
+    const label = cut > 0 ? `<span class="repo-owner">${esc(path.slice(0, cut))}</span>${esc(path.slice(cut))}` : esc(path);
+    return `<a class="link-pill" href="${esc(p.githubUrl)}" target="_blank" rel="noopener noreferrer" title="${esc(p.githubUrl)}">${icon('github')}<span>${label}</span></a>`;
   }
 
   // Overlapping avatars (each one filters by that student) followed by first names.
   function people(members) {
     const first = (m) => m.split(/\s+/)[0];
     const shown = members.slice(0, 2).map(first).join(', ');
-    const extra = members.length > 2 ? ` <em>+${members.length - 2}</em>` : '';
+    const extra = members.length > 2 ? `<em>+${members.length - 2}</em>` : '';
+    // Names truncate on their own so the "+N" count always stays visible.
     return `<div class="people">
       <div class="avatar-stack">${members.slice(0, 3).map((m) =>
         `<button type="button" class="avatar-btn" data-action="member" data-member="${esc(m)}" title="${esc(m)} · show only this student’s team">${avatar(m)}</button>`).join('')}</div>
-      <span class="people-names" title="${esc(members.join(', '))}">${esc(shown)}${extra}</span>
+      <span class="people-names" title="${esc(members.join(', '))}"><span>${esc(shown)}</span>${extra}</span>
     </div>`;
   }
 
@@ -682,7 +696,7 @@
     </div>`;
   }
 
-  function renderTable(list) {
+  function renderTable(list, scrollLeft = 0) {
     const seq = sequence();
     el.view.innerHTML = `
       <div class="card table-card"><div class="table-scroll">
@@ -694,18 +708,29 @@
           </tr></thead>
           <tbody>${list.map((p, i) => `
             <tr style="animation-delay:${Math.min(i, 20) * 22}ms">
-              <td><span class="seq">${seqLabel(seq.get(p.id))}</span></td>
-              <td class="team-cell"><strong>${esc(p.teamName)}</strong><time datetime="${esc(p.createdAt)}" title="${esc(absTime(p.createdAt))}">Submitted ${relTime(p.createdAt)}</time></td>
+              <td class="seq-cell"><span class="seq">${seqLabel(seq.get(p.id))}</span></td>
+              <td class="team-cell"><strong title="${esc(p.teamName)}">${esc(p.teamName)}</strong><time datetime="${esc(p.createdAt)}" title="${esc(absTime(p.createdAt))}">Submitted ${relTime(p.createdAt)}</time></td>
               <td class="members-cell">${people(p.members)}</td>
               <td class="project-cell"><div class="title-row"><strong title="${esc(p.title)}">${esc(p.title)}</strong>${typeTag(p)}</div>${p.techStack ? `<span class="stack" title="${esc(p.techStack)}">${esc(p.techStack)}</span>` : ''}</td>
-              <td>${deployLink(p)}</td>
-              <td>${repoLink(p)}</td>
-              <td>${evalCell(p)}</td>
+              <td class="deploy-cell">${deployLink(p)}</td>
+              <td class="repo-cell">${repoLink(p)}</td>
+              <td class="eval-cell">${evalCell(p)}</td>
               <td class="col-actions teacher-only">${teacherActions(p)}</td>
             </tr>`).join('')}
           </tbody>
         </table>
       </div></div>`;
+    $('.table-scroll', el.view).scrollLeft = scrollLeft;
+    updateTableFades();
+  }
+
+  // Edge fades show that the table scrolls sideways (on narrow desktop windows).
+  function updateTableFades() {
+    const scroller = $('.table-scroll', el.view);
+    if (!scroller) return;
+    const max = scroller.scrollWidth - scroller.clientWidth;
+    scroller.parentElement.classList.toggle('fade-left', scroller.scrollLeft > 2);
+    scroller.parentElement.classList.toggle('fade-right', scroller.scrollLeft < max - 2);
   }
 
   function renderGrid(list) {
@@ -807,7 +832,7 @@
         ${rows}
       </div>` : emptyState('filter', 'No ranked projects match', 'Try another search or tier filter.',
         `<button class="btn btn-secondary" data-action="clear-filters" type="button">Clear filters</button>`)}
-      ${pendingCount ? `<div class="card awaiting">${icon('clock')}<span><strong>${pendingCount}</strong> project${pendingCount === 1 ? '' : 's'} awaiting review — they’ll be ranked once scored.</span></div>` : ''}`;
+      ${pendingCount ? `<div class="card rank-pending">${icon('clock')}<span><strong>${pendingCount}</strong> project${pendingCount === 1 ? '' : 's'} awaiting review — they’ll be ranked once scored.</span></div>` : ''}`;
   }
 
   function renderRubric() {
@@ -1077,10 +1102,18 @@
     if (state.previewId && el.previewDialog.open) fillPreview(find(state.previewId));
   }
 
+  // Shows or hides a password field; the eye icon and the button label follow.
+  function showPassword(input, btn, visible) {
+    input.type = visible ? 'text' : 'password';
+    btn.setAttribute('aria-label', visible ? 'Hide password' : 'Show password');
+    btn.setAttribute('aria-pressed', String(visible));
+    $('use', btn).setAttribute('href', visible ? '#i-eye-off' : '#i-eye');
+  }
+
   function openLogin(after = null) {
     state.afterLogin = after;
     el.loginForm.reset();
-    el.password.type = 'password';
+    showPassword(el.password, $('#togglePw'), false);
     el.loginDialog.showModal();
     setTimeout(() => el.password.focus(), 30);
   }
@@ -1732,7 +1765,7 @@
     ['#pwCurrent', '#pwNew', '#pwConfirm'].forEach((sel) => {
       const input = $(sel);
       input.value = '';
-      input.type = 'password';
+      showPassword(input, $(`[data-toggle-pw="${input.id}"]`), false);
       input.closest('.field').classList.remove('invalid');
     });
     updatePasswordMeter();
@@ -1893,7 +1926,7 @@
     $$('#deviceSwitch button').forEach((b) => {
       const on = b.dataset.device === device;
       b.classList.toggle('active', on);
-      b.setAttribute('aria-selected', on);
+      b.setAttribute('aria-pressed', String(on));
     });
   }
 
@@ -2090,6 +2123,45 @@
   function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     store.set('mdc-theme', theme);
+    syncThemeToggle();
+  }
+
+  function syncThemeToggle() {
+    const label = document.documentElement.getAttribute('data-theme') === 'dark' ? 'Switch to light theme' : 'Switch to dark theme';
+    const btn = $('#themeToggle');
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+  }
+
+  // The new theme spreads from the toggle like a drop of ink until it covers the page.
+  // Without View Transitions, or with reduced motion, the theme switches instantly.
+  let themeDrop = 0;
+  function switchTheme() {
+    const root = document.documentElement;
+    const next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    if (!document.startViewTransition || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      applyTheme(next);
+      return;
+    }
+    const b = $('#themeToggle').getBoundingClientRect();
+    const x = b.left + b.width / 2;
+    const y = b.top + b.height / 2;
+    const cover = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+    const at = (r) => `circle(${r}px at ${x}px ${y}px)`;
+    const id = ++themeDrop;
+    root.classList.add('theme-drop'); // pauses colour transitions so the new theme paints at once
+    const transition = document.startViewTransition(() => applyTheme(next));
+    transition.ready.then(() => {
+      root.animate([
+        // A droplet lands on the toggle, then floods outward.
+        { clipPath: at(0), easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+        { clipPath: at(20), offset: 0.16, easing: 'cubic-bezier(0.7, 0, 0.2, 1)' },
+        { clipPath: at(cover) },
+      ], { duration: 900, pseudoElement: '::view-transition-new(root)' });
+    }).catch(() => { /* the theme still switches, without the animation */ });
+    transition.finished.catch(() => {}).then(() => {
+      if (id === themeDrop) root.classList.remove('theme-drop');
+    });
   }
 
   function clearFilters() {
@@ -2122,9 +2194,7 @@
     state.previewId = null;
   });
 
-  $('#themeToggle').addEventListener('click', () => {
-    applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
-  });
+  $('#themeToggle').addEventListener('click', switchTheme);
 
   el.facultyBtn.addEventListener('click', () => { if (!isTeacher()) openLogin(); });
   $('#signOutBtn').addEventListener('click', () => logout());
@@ -2276,8 +2346,7 @@
   }));
   $$('[data-toggle-pw]').forEach((btn) => btn.addEventListener('click', () => {
     const input = document.getElementById(btn.dataset.togglePw);
-    input.type = input.type === 'password' ? 'text' : 'password';
-    btn.setAttribute('aria-label', input.type === 'password' ? 'Show password' : 'Hide password');
+    showPassword(input, btn, input.type === 'password');
     input.focus();
   }));
   el.controlDialog.addEventListener('close', clearPasswordForm);
@@ -2287,7 +2356,7 @@
   $('#qSkip').addEventListener('click', () => saveForLater());
 
   $('#togglePw').addEventListener('click', () => {
-    el.password.type = el.password.type === 'password' ? 'text' : 'password';
+    showPassword(el.password, $('#togglePw'), el.password.type === 'password');
     el.password.focus();
   });
 
@@ -2371,8 +2440,11 @@
   function measureTopbar() {
     document.documentElement.style.setProperty('--topbar-h', `${topbar.offsetHeight}px`);
     onScroll();
+    updateTableFades();
   }
   window.addEventListener('scroll', onScroll, { passive: true });
+  // Scroll events don't bubble, so listen in the capture phase for the table's own scroller.
+  el.view.addEventListener('scroll', updateTableFades, { capture: true, passive: true });
   window.addEventListener('resize', measureTopbar);
   measureTopbar();
 
@@ -2388,6 +2460,7 @@
   /* ================================================================= init */
 
   $('#copyrightYear').textContent = new Date().getFullYear();
+  syncThemeToggle();
   renderRubric();
   setDevice(state.device);
   setToken(null, { reload: false });

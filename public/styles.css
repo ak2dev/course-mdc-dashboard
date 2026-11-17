@@ -358,6 +358,14 @@ kbd {
 [data-theme='light'] .theme-sun { display: none; }
 [data-theme='light'] .theme-moon { display: block; }
 
+/* Theme switch: the new theme floods out from the toggle as a widening circle
+   (switchTheme in app.js drives the clip-path). Colour transitions pause meanwhile. */
+.theme-drop::view-transition-old(root),
+.theme-drop::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.theme-drop *,
+.theme-drop *::before,
+.theme-drop *::after { transition: none !important; }
+
 /* ------------------------------------------------------------------ hero */
 
 .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); align-items: end; gap: 56px; padding: 64px 0 36px; }
@@ -702,8 +710,16 @@ button.eval:hover { background: var(--surface-hover); }
 
 /* ----------------------------------------------------------------- table */
 
-.table-card { overflow: hidden; border-radius: 20px; background: var(--surface-solid); }
-.table-scroll { overflow-x: auto; }
+.table-card { position: relative; overflow: hidden; border-radius: 20px; background: var(--surface-solid); }
+/* overflow-y stays hidden so the rows' rise-in animation can't flash a vertical scrollbar. */
+.table-scroll { overflow-x: auto; overflow-y: hidden; }
+/* Edge fades hint that the table scrolls sideways (updateTableFades in app.js). */
+.table-card::before,
+.table-card::after { content: ''; position: absolute; top: 0; bottom: 0; z-index: 2; width: 56px; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+.table-card::before { left: 0; background: linear-gradient(90deg, var(--surface-solid), transparent); }
+.table-card::after { right: 0; background: linear-gradient(270deg, var(--surface-solid), transparent); }
+.table-card.fade-left::before,
+.table-card.fade-right::after { opacity: 1; }
 .data-table { width: 100%; border-collapse: collapse; min-width: 1060px; }
 .data-table th {
   padding: 14px 16px 12px;
@@ -723,15 +739,17 @@ button.eval:hover { background: var(--surface-hover); }
 .data-table tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--text); }
 .data-table tbody tr:last-child td { border-bottom: 0; }
 .data-table .col-seq { width: 64px; padding-left: 24px; }
+.data-table .seq-cell { padding-left: 24px; }
 .data-table .col-actions { width: 96px; text-align: right; padding-right: 20px; }
 
 .seq { display: inline-grid; place-items: center; min-width: 32px; height: 24px; padding: 0 6px; border-radius: 7px; font-size: 12px; color: var(--text-3); background: var(--surface-sunk); border: 1px solid var(--border); }
 .data-table .seq { min-width: 0; height: auto; padding: 0; background: none; border: 0; font-size: 12.5px; }
 
 .team-cell { min-width: 160px; }
-.team-cell strong { display: block; font-weight: 600; font-size: 14.5px; letter-spacing: -0.015em; white-space: nowrap; }
+/* Long team names truncate (full name in the tooltip) instead of widening the table. */
+.team-cell strong { display: block; max-width: 180px; overflow: hidden; text-overflow: ellipsis; font-weight: 600; font-size: 14.5px; letter-spacing: -0.015em; white-space: nowrap; }
 .team-cell time, .meta { display: block; margin-top: 2px; font-size: 12px; color: var(--text-3); white-space: nowrap; }
-.project-cell { max-width: 250px; }
+.project-cell { max-width: 220px; }
 /* The title truncates; the type tag sits beside it and never gets clipped. */
 .project-cell .title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .project-cell strong { min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -746,8 +764,9 @@ button.eval:hover { background: var(--surface-hover); }
 .avatar-btn:first-child { margin-left: 0; }
 .avatar-btn .avatar { width: 28px; height: 28px; font-size: 10px; }
 .avatar-btn:hover { transform: translateY(-2px); z-index: 1; }
-.people-names { font-size: 13px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.people-names em { font-style: normal; color: var(--text-3); }
+.people-names { display: flex; gap: 4px; min-width: 0; max-width: 96px; font-size: 13px; color: var(--text-2); white-space: nowrap; }
+.people-names span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.people-names em { flex: none; font-style: normal; color: var(--text-3); }
 
 .awaiting { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-3); white-space: nowrap; }
 .awaiting::before { content: ''; width: 8px; height: 8px; border-radius: 50%; border: 1.5px dashed var(--text-3); animation: spin 6s linear infinite; }
@@ -774,10 +793,18 @@ button.eval:hover { background: var(--surface-hover); }
 .link-pill .i { width: 13px; height: 13px; }
 .link-pill:hover { color: var(--text); border-color: var(--border-strong); background: var(--surface-hover); }
 .link-pill.deploy .i { color: var(--text); }
+/* Capped so all seven columns fit the page width; the full URL is in the tooltip. */
+.data-table .link-pill { max-width: 120px; }
 .not-provided { font-size: 12.5px; color: var(--text-3); font-style: italic; }
 .row-actions { display: inline-flex; gap: 6px; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Background refreshes swap content in place, without replaying entrance animations. */
+.view.calm .data-table tbody tr,
+.view.calm .p-card,
+.view.calm .podium-card,
+.view.calm .rank-row { animation: none; }
 
 /* ------------------------------------------------------------------ grid */
 
@@ -844,8 +871,8 @@ button.eval:hover { background: var(--surface-hover); }
 .rank-links { display: flex; justify-content: flex-end; gap: 6px; }
 .rank-head { background: var(--surface-sunk); font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); padding-top: 11px; padding-bottom: 11px; animation: none; }
 .rank-head:hover { background: var(--surface-sunk); }
-.awaiting { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 14px 18px; font-size: 13px; color: var(--text-2); }
-.awaiting .i { color: var(--t-pending); }
+.rank-pending { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 14px 18px; font-size: 13px; color: var(--text-2); }
+.rank-pending .i { color: var(--t-pending); }
 
 /* ----------------------------------------------------------- empty state */
 
@@ -920,6 +947,7 @@ button.eval:hover { background: var(--surface-hover); }
 .modal {
   width: min(640px, calc(100vw - 32px));
   max-height: calc(100vh - 48px);
+  max-height: calc(100dvh - 48px);
   padding: 0;
   border: 1px solid var(--border-strong);
   border-radius: 20px;
@@ -932,7 +960,7 @@ button.eval:hover { background: var(--surface-hover); }
 .modal > form { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .modal::backdrop { background: var(--backdrop); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: fade-in 0.25s ease; }
 .modal-sm { width: min(440px, calc(100vw - 32px)); }
-.modal-xl { width: min(1440px, calc(100vw - 32px)); height: calc(100vh - 32px); max-height: none; }
+.modal-xl { width: min(1440px, calc(100vw - 32px)); height: calc(100vh - 32px); height: calc(100dvh - 32px); max-height: none; }
 @keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
 @keyframes fade-in { from { opacity: 0; } }
 
@@ -1197,7 +1225,7 @@ button.eval:hover { background: var(--surface-hover); }
 
 /* -------------------------------------------------------- control center */
 
-.modal-lg { width: min(1040px, calc(100vw - 32px)); height: min(720px, calc(100vh - 48px)); }
+.modal-lg { width: min(1040px, calc(100vw - 32px)); height: min(720px, calc(100vh - 48px)); height: min(720px, calc(100dvh - 48px)); }
 .control-shell { display: grid; grid-template-columns: 210px 1fr; flex: 1; min-height: 0; border-top: 1px solid var(--border); margin-top: 16px; }
 
 .control-nav { display: flex; flex-direction: column; gap: 2px; padding: 14px 10px; border-right: 1px solid var(--border); background: var(--surface-sunk); overflow-y: auto; }
@@ -1579,6 +1607,18 @@ button.eval:hover { background: var(--surface-hover); }
 
 /* ------------------------------------------------------------ responsive */
 
+/* Laptop widths: a tighter table keeps the Evaluation column in view. */
+@media (max-width: 1440px) {
+  .data-table th, .data-table td { padding-left: 12px; padding-right: 12px; }
+  .data-table .col-seq, .data-table .seq-cell { padding-left: 20px; }
+}
+@media (max-width: 1280px) {
+  .team-cell strong { max-width: 150px; }
+  .people-names { max-width: 80px; }
+  .data-table .link-pill { max-width: 104px; }
+  .data-table .repo-owner { display: none; } /* "owner/repo" → "repo" */
+}
+
 @media (max-width: 1180px) {
   .hero { grid-template-columns: minmax(0, 1fr) minmax(0, 360px); gap: 36px; }
   .rank-row { grid-template-columns: 48px minmax(160px, 1.3fr) minmax(150px, 1.1fr) 140px 84px; }
@@ -1608,7 +1648,7 @@ button.eval:hover { background: var(--surface-hover); }
   .hide-sm { display: none; }
   #facultyBtn .label, #controlBtn .label { display: none; }
   #facultyBtn, #controlBtn { width: 38px; padding: 0; }
-  .modal-lg { width: calc(100vw - 16px); height: calc(100vh - 16px); }
+  .modal-lg { width: calc(100vw - 16px); height: calc(100vh - 16px); height: calc(100dvh - 16px); }
   .control-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
   .control-nav { flex-direction: row; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); padding: 8px; scrollbar-width: none; }
   .control-nav button { flex: none; height: 34px; }
@@ -1625,7 +1665,10 @@ button.eval:hover { background: var(--surface-hover); }
   .section-head { margin-top: 44px; flex-direction: column; align-items: flex-start; gap: 12px; }
   .section-meta { justify-content: flex-start; }
   .section-head h2 { font-size: 24px; }
-  .toolbar { flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0 -16px 12px; padding: 10px 16px; }
+  /* On phones the filter bar scrolls away instead of docking, so the list gets the screen. */
+  .toolbar { position: static; flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: 0 -16px 12px; padding: 10px 16px; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .toolbar.stuck { border-bottom-color: transparent; }
+  .search kbd { display: none; }
   .toolbar > * { min-width: 0; }
   .chips { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; margin: 0 -16px; padding-left: 16px; padding-right: 16px; scrollbar-width: none; }
   .chips::-webkit-scrollbar { display: none; }
@@ -1649,8 +1692,8 @@ button.eval:hover { background: var(--surface-hover); }
   .submit-menu { position: fixed; top: calc(var(--topbar-h, 64px) + 6px); left: 16px; right: 16px; width: auto; }
   .span-2 { grid-column: auto; }
   .score-editor { flex-direction: column; align-items: stretch; }
-  .modal { max-height: calc(100vh - 24px); border-radius: 18px; }
-  .modal-xl { width: calc(100vw - 16px); height: calc(100vh - 16px); }
+  .modal { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); border-radius: 18px; }
+  .modal-xl { width: calc(100vw - 16px); height: calc(100vh - 16px); height: calc(100dvh - 16px); }
   .modal-head, .modal-body, .modal-foot { padding-left: 18px; padding-right: 18px; }
   .modal-foot { flex-direction: column; align-items: stretch; }
   .foot-actions { margin-left: 0; }
@@ -1660,6 +1703,45 @@ button.eval:hover { background: var(--surface-hover); }
   .rubric li { grid-template-columns: 40px 1fr; }
   .rubric .r-range { grid-column: 2; justify-self: start; }
   .toasts { top: auto; bottom: 16px; right: 16px; }
+
+  /* Phones: each table row stacks into a compact card instead of scrolling sideways. */
+  .table-scroll { overflow: visible; }
+  .data-table, .data-table tbody { display: block; min-width: 0; }
+  .data-table thead { display: none; }
+  .data-table tbody tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    padding: 16px 16px 16px 48px;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table tbody tr:last-child { border-bottom: 0; }
+  .data-table tbody tr:hover td:first-child { box-shadow: none; }
+  .data-table td { display: block; min-width: 0; padding: 0; border: 0; }
+  /* Order: team (+ faculty actions) · evaluation · project · members · links. */
+  .data-table .seq-cell { position: absolute; top: 18px; left: 16px; padding: 0; }
+  .data-table .team-cell { order: 1; flex: 1 1 0; }
+  .data-table .col-actions { order: 2; flex: none; align-self: flex-start; width: auto; padding: 0; }
+  .data-table .eval-cell { order: 3; flex: 1 1 100%; }
+  .data-table .project-cell { order: 4; flex: 1 1 100%; max-width: none; }
+  .data-table .members-cell { order: 5; flex: 1 1 100%; }
+  .data-table .deploy-cell { order: 6; flex: 0 1 auto; }
+  .data-table .repo-cell { order: 7; flex: 0 1 auto; }
+  .data-table .team-cell strong { max-width: none; white-space: normal; }
+  .data-table .people-names { max-width: none; }
+  .data-table .link-group { min-width: 0; }
+  .data-table .link-pill { min-width: 0; max-width: 100%; }
+}
+
+/* Small phones in faculty mode: drop the wordmark (the monogram stays) so the five
+   top-bar buttons fit on one row instead of wrapping onto a third. */
+@media (max-width: 440px) {
+  body.is-teacher .brand-text { display: none; }
+}
+
+@media (hover: none) {
+  .search kbd { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
