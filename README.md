@@ -11,6 +11,7 @@ api/index.js     Vercel serverless entry; all /api/* requests are rewritten here
 lib/app.js       API routes, validation, auth, embed check
 lib/export.js    Faculty exports: PDF / HTML report, Excel, CSV, JSON
 lib/xlsx.js      Dependency-free .xlsx reader (roster) and writer (export)
+lib/frame.js     Whether a site's X-Frame-Options / CSP frame-ancestors lets the preview embed it
 lib/store.js     Storage: MongoDB when MONGODB_URI is set, else data/projects.json
 public/          Frontend (served as static files)
 server.js        Local dev server (static files + the same API handler)
@@ -70,6 +71,8 @@ These commands target MongoDB when `MONGODB_URI` is set and the JSON file otherw
 
 Faculty can browse a desktop / mobile app's Drive folder inside the preview window while grading. This works for folder links (`drive.google.com/drive/folders/…`) and single-file links shared as "Anyone with the link"; other Drive links open in Google Drive instead. Projects submitted before types existed count as web projects. Every export records each project's type and its Drive folder link.
 
+Web projects open in the preview at desktop, tablet or phone width. Browsers won't show a site there if it sends `X-Frame-Options: DENY` / `SAMEORIGIN`, or a CSP `frame-ancestors` rule that doesn't list the dashboard. The preview then offers to open the site in a pop-up window of the chosen device size, and shows the header the team can send to allow the dashboard while keeping clickjacking protection: `Content-Security-Policy: frame-ancestors 'self' https://<your-dashboard>`.
+
 ## Exports (faculty)
 
 The **Export** button (hero and footer) opens a dialog with five formats. Exports always include scores, tiers, ranks and reviewer notes, even while results are hidden from students, so only signed-in faculty can export; anyone else is asked to sign in first. The Danger zone's **Export** button opens the same dialog with JSON selected, for a backup before bulk actions.
@@ -121,7 +124,7 @@ This runs the end-to-end API checks covering the core API, both submission types
 
 Test teams are deleted and settings restored afterwards. Destructive bulk actions only have their confirmation guards tested, and "sign out all faculty" only runs against localhost. The suite signs in several times, so wait a minute before signing in from the browser if you hit the sign-in rate limit.
 
-Unit tests cover roster parsing, name matching, the .xlsx reader and writer, and every export format (columns, filtering, ranks, time zones, HTML escaping). They use made-up names and need no server:
+Unit tests cover roster parsing, name matching, the .xlsx reader and writer, every export format (columns, filtering, ranks, time zones, HTML escaping) and the preview's embedding check (frame-ancestors sources, ports, wildcards, X-Frame-Options precedence). They use made-up names and need no server:
 
 ```bash
 npm run test:unit
@@ -148,7 +151,7 @@ npm run test:unit
 | `POST`   | `/api/auth/login`       | body `{ "password": "…" }` |
 | `POST`   | `/api/auth/logout`      | faculty |
 | `GET`    | `/api/auth/session`     | public (returns `{ authenticated }` for the sent token) |
-| `GET`    | `/api/frame-check?url=` | public  |
+| `GET`    | `/api/frame-check?url=&from=` | public (`from` is the dashboard's origin; defaults to the request's host) |
 | `PATCH`  | `/api/admin/settings`   | faculty |
 | `GET`    | `/api/admin/activity?limit=` | faculty |
 | `POST`   | `/api/admin/reset-scores` | faculty, body `{ "confirm": "RESET" }` |

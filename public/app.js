@@ -49,6 +49,7 @@
     query: '',
     device: DEVICES[store.get('mdc-device')] ? store.get('mdc-device') : 'desktop',
     previewId: null,
+    frameFix: null, // which header blocks the open preview: 'frame-ancestors' | 'x-frame-options'
     editingId: null,
     confirmHandler: null,
     controlTab: 'overview',
@@ -1928,6 +1929,7 @@
       b.classList.toggle('active', on);
       b.setAttribute('aria-pressed', String(on));
     });
+    if (!el.frameBlocked.hidden) renderBlockedActions();
   }
 
   function fillPreview(p) {
@@ -1966,11 +1968,67 @@
     $('#previewNotes').textContent = p.reviewerNotes || '';
   }
 
-  function showFrameBlocked(title, reason) {
+  // `fix` names the header that blocks the site, so the panel can offer a sized window and the header to send.
+  function showFrameBlocked(title, reason, { fix = null, header = '' } = {}) {
     $('#frameBlockedTitle').textContent = title;
-    $('#frameBlockedReason').textContent = reason;
+    if (header) {
+      // The header sits in a code chip so it never breaks mid-word.
+      const code = Object.assign(document.createElement('code'), { textContent: header, title: header });
+      $('#frameBlockedReason').replaceChildren('The site sends ', code, '.');
+    } else {
+      $('#frameBlockedReason').textContent = reason;
+    }
+    state.frameFix = fix;
+    renderBlockedActions();
     el.frameBlocked.hidden = false;
     el.frameLoading.classList.add('done');
+  }
+
+  // Phone and tablet previews of a blocked site open in a pop-up window of that size
+  // (frame rules only apply to iframes); the panel also shows the header that would allow this dashboard.
+  const DEVICE_WINDOWS = { tablet: [768, 1024], mobile: [390, 844] };
+
+  function renderBlockedActions() {
+    const size = state.frameFix ? DEVICE_WINDOWS[state.device] : null;
+    const win = $('#frameBlockedWindow');
+    win.hidden = !size;
+    if (size) {
+      $('#frameBlockedWindowLabel').textContent = `Open at ${size[0]} px`;
+      $('use', win).setAttribute('href', state.device === 'tablet' ? '#i-tablet' : '#i-phone');
+    }
+    $('#frameBlockedOpen').classList.toggle('btn-primary', !size);
+    $('#frameBlockedOpen').classList.toggle('btn-secondary', Boolean(size));
+
+    $('#frameBlockedFix').hidden = !state.frameFix;
+    if (!state.frameFix) return;
+    const rule = `frame-ancestors 'self' ${location.origin}`;
+    const replaceXfo = state.frameFix === 'x-frame-options';
+    $('#frameFixLead').textContent = replaceXfo
+      ? 'To show it here, the team can replace X-Frame-Options with this header:'
+      : 'To show it here, the team can change that rule in their Content-Security-Policy to:';
+    // Each word is its own box, so lines break between words instead of inside "frame-ancestors";
+    // the text (and what gets copied) stays exactly the header.
+    const code = $('#frameFixCode');
+    code.replaceChildren();
+    (replaceXfo ? `Content-Security-Policy: ${rule}` : rule).split(' ').forEach((word, i) => {
+      if (i) code.append(' ');
+      code.append(Object.assign(document.createElement('span'), { textContent: word }));
+    });
+  }
+
+  function openDeviceWindow(url) {
+    const size = DEVICE_WINDOWS[state.device];
+    if (!size || !/^https?:\/\//i.test(url)) return;
+    const [w, h] = size;
+    const features = `popup,width=${w},height=${Math.min(h, screen.availHeight - 80)},`
+      + `left=${Math.max(0, window.screenX + 40)},top=${Math.max(0, window.screenY + 60)}`;
+    const win = window.open('about:blank', '_blank', features);
+    if (!win) {
+      toast('Pop-up blocked', 'Allow pop-ups for this dashboard, or use Open in new tab.', 'error');
+      return;
+    }
+    win.opener = null; // the team's site must not be able to reach back into the dashboard
+    win.location.href = url;
   }
 
   async function loadFrame(p) {
@@ -1979,6 +2037,7 @@
     el.frameLoading.classList.remove('done');
     $('#frameLoadingText').textContent = app ? 'Loading Drive folder…' : 'Loading deployment…';
     el.frameBlocked.hidden = true;
+    state.frameFix = null;
     el.frame.src = 'about:blank';
 
     // Drive folders embed through embeddedfolderview, single files through /preview;
@@ -2003,10 +2062,11 @@
     if (app) return;
 
     try {
-      const check = await api(`/api/frame-check?url=${encodeURIComponent(url)}`);
+      // `from` lets the server match frame-ancestors rules against this dashboard's own origin.
+      const check = await api(`/api/frame-check?url=${encodeURIComponent(url)}&from=${encodeURIComponent(location.origin)}`);
       if (token !== frameToken) return;
       if (!check.embeddable) {
-        showFrameBlocked('This site can’t be embedded', `${check.reason} Open the deployment directly to review it.`);
+        showFrameBlocked('This site can’t be embedded', check.reason, { fix: check.blockedBy || 'x-frame-options', header: check.header });
       } else if (check.error === 'unreachable') {
         toast('Deployment may be offline', 'The server could not reach this URL. The preview may not load.', 'info');
       }
@@ -2382,6 +2442,14 @@
   $('#deviceSwitch').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-device]');
     if (btn) setDevice(btn.dataset.device);
+  });
+  $('#frameBlockedWindow').addEventListener('click', () => {
+    const p = find(state.previewId);
+    if (p) openDeviceWindow(linkOf(p));
+  });
+  $('#frameFixCopy').addEventListener('click', async () => {
+    if (await copyText($('#frameFixCode').textContent)) toast('Header copied', 'Send it to the team so their site can be previewed here.', 'success');
+    else toast('Copy failed', 'Select the header text and copy it instead.', 'error');
   });
 
   let searchTimer;

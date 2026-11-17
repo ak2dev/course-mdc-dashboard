@@ -1142,6 +1142,15 @@ button.eval:hover { background: var(--surface-hover); }
 .frame-loading.done { opacity: 0; pointer-events: none; }
 .frame-blocked h3 { font-size: 17px; color: var(--text); }
 .frame-blocked p { max-width: 340px; }
+/* "safe" keeps the top reachable when the panel is taller than a short device frame. */
+.frame-blocked { overflow-y: auto; justify-content: safe center; }
+.frame-blocked p code { display: inline-block; max-width: 100%; padding: 0 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-sunk); font: 12px/1.7 'Geist Mono', ui-monospace, monospace; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+.blocked-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.blocked-fix { display: grid; gap: 8px; width: min(100%, 420px); margin-top: 6px; padding-top: 16px; border-top: 1px dashed var(--border-strong); text-align: left; }
+.frame-blocked .blocked-fix p { max-width: none; font-size: 12.5px; }
+.blocked-code { display: flex; align-items: flex-start; gap: 8px; padding: 9px 8px 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-sunk); }
+.blocked-code code { flex: 1; min-width: 0; padding-top: 4px; font: 12px/1.5 'Geist Mono', ui-monospace, monospace; color: var(--text); overflow-wrap: anywhere; }
+.blocked-code code span { display: inline-block; max-width: 100%; }
 .blocked-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; color: var(--text); background: var(--surface-hover); border: 1px solid var(--border-strong); }
 .blocked-icon .i { width: 22px; height: 22px; }
 
